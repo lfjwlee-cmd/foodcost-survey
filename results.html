@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시식 평가 결과 대시보드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&display=swap">
+<style>
+  :root{--bg:#f3f2ef;--surface:#fff;--surface-2:#faf9f7;--ink:#1d1b18;--muted:#6f6b64;--faint:#9a958d;--line:#e6e3dd;--line-strong:#d4d0c8;--accent:#c1553a;--accent-soft:#f3e2db;--good:#2f8f5b;--warn:#c9922b;--bad:#c0433a;--shadow:0 1px 2px rgba(30,25,20,.04),0 8px 24px -12px rgba(30,25,20,.14);--r:14px}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161513;--surface:#201e1b;--surface-2:#1a1917;--ink:#f0ede7;--muted:#a8a29a;--faint:#726d64;--line:#302d29;--line-strong:#413d37;--accent:#e0755a;--accent-soft:#3a251e;--good:#4bb078;--warn:#e0ab48;--bad:#e0655b;--shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px -14px rgba(0,0,0,.6)}}
+  :root[data-theme="dark"]{--bg:#161513;--surface:#201e1b;--surface-2:#1a1917;--ink:#f0ede7;--muted:#a8a29a;--faint:#726d64;--line:#302d29;--line-strong:#413d37;--accent:#e0755a;--accent-soft:#3a251e;--good:#4bb078;--warn:#e0ab48;--bad:#e0655b;--shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px -14px rgba(0,0,0,.6)}
+  *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans KR",system-ui,sans-serif;line-height:1.5;font-size:15px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 20px 80px}
+  .num{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+  header.top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+  .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);font-weight:500}
+  h1{font-size:26px;font-weight:700;margin:.28em 0 .12em;letter-spacing:-.01em}
+  .sub{color:var(--muted);font-size:14px}
+  .ctrls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  select,.btn{background:var(--surface);border:1px solid var(--line-strong);color:var(--ink);border-radius:9px;padding:8px 12px;font-family:inherit;font-size:13px;cursor:pointer}
+  .btn:hover{border-color:var(--accent)}
+  .live{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--good);display:flex;align-items:center;gap:5px}
+  .live i{width:7px;height:7px;border-radius:50%;background:var(--good);animation:blink 2s infinite}@keyframes blink{50%{opacity:.3}}
+  .filters{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:15px 16px;box-shadow:var(--shadow);margin-bottom:20px}
+  .filter-row{display:flex;gap:22px;flex-wrap:wrap}.fgroup{display:flex;flex-direction:column;gap:7px}
+  .flabel{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{border:1px solid var(--line-strong);background:var(--surface-2);color:var(--muted);border-radius:8px;padding:5px 11px;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center}
+  .chip:hover{border-color:var(--accent);color:var(--ink)}.chip.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:500}
+  .brand-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+  .kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 17px;box-shadow:var(--shadow)}
+  .kpi .k-label{font-size:12.5px;color:var(--muted);margin-bottom:9px}.kpi .k-val{font-family:"IBM Plex Mono",monospace;font-size:29px;font-weight:600;line-height:1}.kpi .k-val small{font-size:14px;color:var(--faint)}.kpi .k-note{font-size:11.5px;color:var(--faint);margin-top:7px}
+  .grid{display:grid;gap:16px}.g2{grid-template-columns:1.05fr .95fr}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px 19px;box-shadow:var(--shadow);min-width:0}
+  .card h2{font-size:15px;font-weight:600;margin:0 0 3px}.card .cap{font-size:12px;color:var(--faint);margin:0 0 15px}
+  section.block{margin-top:16px}
+  .insight{background:linear-gradient(180deg,var(--accent-soft),transparent);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:10px;padding:13px 15px;font-size:13.5px;margin-bottom:15px}.insight b{color:var(--accent)}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th{text-align:left;font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:500;padding:0 8px 9px;border-bottom:1px solid var(--line)}
+  td{padding:11px 8px;border-bottom:1px solid var(--line)}tr:last-child td{border-bottom:none}
+  .prod-cell b{font-weight:600}.prod-cell span{display:block;font-size:11.5px;color:var(--faint)}
+  .signal{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap}
+  .sig-go{background:color-mix(in srgb,var(--good) 15%,transparent);color:var(--good)}.sig-hold{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}.sig-no{background:color-mix(in srgb,var(--bad) 15%,transparent);color:var(--bad)}
+  .score-b{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-weight:600}
+  .heat{display:grid;gap:4px;overflow-x:auto}.heat-row{display:grid;gap:4px;min-width:440px}
+  .heat-h{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--faint);text-align:center;padding:4px 0}
+  .heat-rl{font-size:12.5px;color:var(--muted);display:flex;align-items:center;font-weight:500}
+  .cell{border-radius:7px;padding:11px 0;text-align:center;font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-weight:600;font-size:14px;color:var(--ink)}
+  .radar-wrap{display:flex;justify-content:center;padding:6px 0}.radar-legend{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-top:6px;font-size:12px;color:var(--muted)}.lg{display:inline-flex;align-items:center;gap:6px}.lg i{width:11px;height:3px;border-radius:2px}
+  .bar-row{display:grid;grid-template-columns:110px 1fr 46px;align-items:center;gap:10px;margin-bottom:9px;font-size:13px}
+  .bar-track{background:var(--surface-2);border-radius:6px;height:22px;overflow:hidden;border:1px solid var(--line)}.bar-fill{height:100%;border-radius:6px 0 0 6px;background:var(--accent);transition:width .4s}.bar-fill.alt{background:color-mix(in srgb,var(--accent) 55%,var(--muted))}
+  .bar-val{text-align:right;font-family:"IBM Plex Mono",monospace;color:var(--muted);font-size:12.5px}.winner{color:var(--accent);font-weight:600}
+  .op{border-left:2px solid var(--line-strong);padding:3px 0 3px 13px;margin-bottom:13px;font-size:13px}.op .op-meta{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--faint);margin-top:4px}.op q{color:var(--ink)}
+  .prod-picker{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:15px}
+  .pp{border:1px solid var(--line-strong);background:var(--surface-2);border-radius:8px;padding:6px 11px;font-size:12.5px;cursor:pointer;font-family:inherit;color:var(--muted);display:flex;align-items:center}.pp:hover{color:var(--ink);border-color:var(--accent)}.pp.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+  .empty{color:var(--faint);font-size:13px;padding:40px 0;text-align:center}
+  .banner{background:color-mix(in srgb,var(--warn) 14%,transparent);border:1px solid var(--warn);color:var(--warn);border-radius:10px;padding:11px 14px;font-size:12.5px;margin-bottom:16px;display:none}
+  @media(max-width:820px){.kpis{grid-template-columns:repeat(2,1fr)}.g2{grid-template-columns:1fr}h1{font-size:22px}}
+  @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">인생푸드 · 신메뉴 시식</div>
+      <h1>시식 평가 결과 대시보드</h1>
+      <p class="sub" id="sub">응답을 불러오는 중…</p>
+    </div>
+    <div class="ctrls">
+      <span class="live"><i></i> 실시간</span>
+      <select id="slugSel" title="시식 회차"></select>
+      <button class="btn" id="refresh">↻ 새로고침</button>
+      <button class="btn" id="csv">CSV</button>
+      <button class="btn" id="themeBtn">◐</button>
+    </div>
+  </header>
+
+  <div class="banner" id="cfgBanner">⚠ config.js 에 Supabase 키가 아직 입력되지 않았습니다. 응답을 불러오려면 키를 넣고 배포하세요.</div>
+
+  <div class="filters">
+    <div class="filter-row">
+      <div class="fgroup"><span class="flabel">브랜드</span><div class="chips" data-filter="brand"></div></div>
+      <div class="fgroup"><span class="flabel">연령대</span><div class="chips" data-filter="age"></div></div>
+      <div class="fgroup"><span class="flabel">성별</span><div class="chips" data-filter="gender"></div></div>
+    </div>
+  </div>
+
+  <div id="body"><div class="empty">데이터 대기 중…</div></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script>
+"use strict";
+let CFG=null,sb=null,AXES=[],ROWS=[],SLUG="";
+const state={brand:"전체",age:"전체",gender:"전체",product:0};
+try{const {SUPABASE_URL,SUPABASE_ANON_KEY}=window.SURVEY_CONFIG||{};if(SUPABASE_URL&&!SUPABASE_URL.includes("여기에")){sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);}else{document.getElementById("cfgBanner").style.display="block";}}catch(e){}
+
+const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
+const f1=v=>v.toFixed(1);
+function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
+function mean5(s){return avg(AXES.map(a=>s[a.key]).filter(v=>typeof v==="number"));}
+function brandColor(n){const b=(CFG.meta.brands||[]).find(x=>x.name===n);return b?b.color:"var(--accent)";}
+function brandList(){return (CFG.meta.brands||[]).map(b=>b.name);}
+
+fetch("questions.json").then(r=>r.json()).then(cfg=>{CFG=cfg;AXES=cfg.axes;SLUG=cfg.slug||"default";boot();})
+  .catch(()=>{document.getElementById("body").innerHTML='<div class="empty">questions.json 을 불러오지 못했습니다.</div>';});
+
+async function boot(){
+  buildFilters();
+  document.getElementById("refresh").onclick=load;
+  document.getElementById("csv").onclick=exportCsv;
+  document.getElementById("themeBtn").onclick=()=>{const c=document.documentElement.getAttribute("data-theme");const n=c==="dark"?"light":(c==="light"?"dark":(matchMedia("(prefers-color-scheme: dark)").matches?"light":"dark"));document.documentElement.setAttribute("data-theme",n);};
+  // slug 목록
+  const sel=document.getElementById("slugSel");
+  if(sb){
+    const {data}=await sb.from("svy_responses").select("survey_slug");
+    const slugs=[...new Set((data||[]).map(r=>r.survey_slug))];
+    if(!slugs.includes(SLUG))slugs.unshift(SLUG);
+    sel.innerHTML=slugs.map(s=>`<option ${s===SLUG?"selected":""}>${esc(s)}</option>`).join("");
+  }else{sel.innerHTML=`<option>${esc(SLUG)}</option>`;}
+  sel.onchange=()=>{SLUG=sel.value;load();};
+  load();
+  setInterval(load,15000);
+}
+
+async function load(){
+  if(!sb){ROWS=[];render();return;}
+  const {data,error}=await sb.from("svy_responses").select("*").eq("survey_slug",SLUG).order("created_at",{ascending:true});
+  if(error){document.getElementById("body").innerHTML=`<div class="empty">불러오기 실패: ${esc(error.message)}</div>`;return;}
+  ROWS=data||[];render();
+}
+
+function buildFilters(){
+  const F={brand:["전체",...brandList()],age:["전체",...CFG.segments.age],gender:["전체",...CFG.segments.gender]};
+  document.querySelectorAll(".chips[data-filter]").forEach(box=>{
+    const key=box.dataset.filter;box.innerHTML="";
+    F[key].forEach(v=>{const b=document.createElement("button");b.className="chip"+(state[key]===v?" on":"");b.textContent=v;
+      if(key==="brand"&&v!=="전체"){const d=document.createElement("span");d.className="brand-dot";d.style.background=brandColor(v);b.prepend(d);}
+      b.onclick=()=>{state[key]=v;render();};box.appendChild(b);});
+  });
+}
+
+// flatten → 제품 평가 단위
+function evAll(){const ev=[];ROWS.forEach((r,ri)=>{(r.items||[]).forEach(it=>{ev.push({ri,gender:r.gender,age:r.age,brand:it.brand,name:it.name,cat:it.cat,s:it});});});return ev;}
+function evF(){return evAll().filter(e=>(state.brand==="전체"||e.brand===state.brand)&&(state.age==="전체"||e.age===state.age)&&(state.gender==="전체"||e.gender===state.gender));}
+function rowsF(){return ROWS.filter(r=>(state.age==="전체"||r.age===state.age)&&(state.gender==="전체"||r.gender===state.gender));}
+
+function render(){
+  buildFilters();
+  document.getElementById("sub").textContent=`${SLUG} · 총 ${ROWS.length}명 응답`;
+  if(!ROWS.length){document.getElementById("body").innerHTML=`<div class="empty">아직 응답이 없습니다. QR로 폼을 공유하면 여기에 실시간으로 쌓입니다.</div>`;return;}
+  const ev=evF(),resp=rowsF();
+  const prodNames=[...new Set(evAll().map(e=>e.name))];
+  document.getElementById("body").innerHTML=`
+    <div class="kpis" id="kpis"></div>
+    <div class="insight" id="insight"></div>
+    <div class="grid g2 block">
+      <div class="card"><h2>🚦 제품 랭킹 · 출시 판정</h2><p class="cap">관능 ${AXES.length}축 평균 기준</p><div style="overflow-x:auto"><table id="rankTable"></table></div></div>
+      <div class="card"><h2>🔥 세그먼트 × 맛 히트맵</h2><p class="cap">연령대별 ${AXES.length}축 평균</p><div class="heat" id="heat"></div></div>
+    </div>
+    <section class="card block"><h2 style="margin-bottom:12px">제품 상세</h2><div class="prod-picker" id="prodPicker"></div>
+      <div class="grid g2"><div><p class="cap" style="margin-bottom:2px">관능 프로필</p><div class="radar-wrap"><svg id="radar" width="300" height="260" viewBox="0 0 300 260"></svg></div><div class="radar-legend" id="radarLegend"></div></div>
+      <div id="votes"></div></div></section>
+    <div class="grid g2 block">
+      <div class="card"><h2>💬 종합 의견</h2><p class="cap">자유 서술 응답</p><div id="opinions"></div></div>
+      <div class="card"><h2>🗳️ 선택·투표 집계</h2><p class="cap">가격·선호·모듈</p><div id="tally"></div></div>
+    </div>`;
+  renderKpis(ev,resp);renderInsight(ev);renderRank(ev);renderHeat(ev);
+  if(state.product>=prodNames.length)state.product=0;
+  renderPicker(prodNames);renderDetail(prodNames);
+  renderOpinions(resp);renderTally(resp);
+}
+
+function renderKpis(ev,resp){
+  const pids=new Set(ev.map(e=>e.name));const overall=avg(ev.map(e=>mean5(e.s)));
+  let top=null;[...pids].forEach(nm=>{const pe=ev.filter(e=>e.name===nm);const m=avg(pe.map(x=>mean5(x.s)));if(!top||m>top.m)top={m,name:nm};});
+  document.getElementById("kpis").innerHTML=[
+    ["응답자 수",`${resp.length}<small> 명</small>`,"필터 적용 후"],
+    ["대상 제품",`${pids.size}<small> 종</small>`,`${new Set(ev.map(e=>e.brand)).size}개 브랜드`],
+    ["관능 종합 평균",ev.length?`${f1(overall)}<small> /5</small>`:"—",`${AXES.length}축 전체`],
+    ["최고 제품",top?`${f1(top.m)}<small> /5</small>`:"—",top?top.name:"—"],
+  ].map(([l,v,n])=>`<div class="kpi"><div class="k-label">${l}</div><div class="k-val num">${v}</div><div class="k-note">${n}</div></div>`).join("");
+}
+function renderInsight(ev){
+  const el=document.getElementById("insight");if(!ev.length){el.innerHTML="선택 조건에 응답이 없습니다.";return;}
+  let bp=null;[...new Set(ev.map(e=>e.name))].forEach(nm=>{const pe=ev.filter(e=>e.name===nm);const m=avg(pe.map(x=>mean5(x.s)));if(!bp||m>bp.m)bp={m,name:nm,brand:pe[0].brand};});
+  let best=null;CFG.segments.age.forEach(age=>{const sub=ev.filter(e=>e.age===age);if(sub.length){const t=avg(sub.map(e=>e.s.taste||0));if(!best||t>best.t)best={age,t};}});
+  let msg="";if(bp)msg+=`관능 종합 1위는 <b>${esc(bp.name)}</b>(${esc(bp.brand)}, ${f1(bp.m)}/5) — 출시 우선 후보. `;
+  if(best)msg+=`'맛'이 가장 높은 연령대는 <b>${esc(best.age)}</b>(${f1(best.t)}/5).`;
+  el.innerHTML="💡 "+msg;
+}
+function signal(m){if(m>=4)return `<span class="signal sig-go">🟢 출시권장</span>`;if(m>=3.3)return `<span class="signal sig-hold">🟡 보완</span>`;return `<span class="signal sig-no">🔴 재검토</span>`;}
+function renderRank(ev){
+  const t=document.getElementById("rankTable");const names=[...new Set(ev.map(e=>e.name))];
+  if(!names.length){t.innerHTML=`<tr><td class="empty">데이터 없음</td></tr>`;return;}
+  const rows=names.map(nm=>{const pe=ev.filter(e=>e.name===nm);return{p:pe[0],m:avg(pe.map(x=>mean5(x.s))),taste:avg(pe.map(x=>x.s.taste||0)),n:pe.length};}).sort((a,b)=>b.m-a.m);
+  t.innerHTML=`<thead><tr><th>제품</th><th>관능</th><th>맛</th><th>n</th><th>판정</th></tr></thead><tbody>`+rows.map(x=>`<tr>
+    <td class="prod-cell"><b><span class="brand-dot" style="background:${brandColor(x.p.brand)}"></span>${esc(x.p.name)}</b><span>${esc(x.p.brand)} · ${esc(x.p.cat||"")}</span></td>
+    <td class="score-b">${f1(x.m)}</td><td class="score-b">${f1(x.taste)}</td><td class="num" style="color:var(--faint)">${x.n}</td><td>${signal(x.m)}</td></tr>`).join("")+`</tbody>`;
+}
+function heatColor(v){const t=Math.max(0,Math.min(1,(v-2.5)/2));const hue=8+t*132;const alpha=0.16+0.5*Math.abs(v-3)/2;return `hsl(${hue} 62% 48% / ${alpha})`;}
+function renderHeat(ev){
+  const el=document.getElementById("heat");el.innerHTML="";const cols=AXES.length;
+  const mk=(inner)=>{const d=document.createElement("div");d.className="heat-row";d.style.gridTemplateColumns=`74px repeat(${cols},1fr)`;d.innerHTML=inner;return d;};
+  el.appendChild(mk(`<div></div>`+AXES.map(a=>`<div class="heat-h">${esc(a.label)}</div>`).join("")));
+  const ages=state.age==="전체"?CFG.segments.age:[state.age];let any=false;
+  ages.forEach(age=>{const sub=ev.filter(e=>e.age===age);let c=`<div class="heat-rl">${esc(age)}</div>`;
+    c+=AXES.map(a=>{const vals=sub.map(e=>e.s[a.key]).filter(v=>typeof v==="number");if(!vals.length)return `<div class="cell" style="color:var(--faint);background:var(--surface-2)">–</div>`;any=true;const v=avg(vals);return `<div class="cell" style="background:${heatColor(v)}">${f1(v)}</div>`;}).join("");
+    el.appendChild(mk(c));});
+  if(!any)el.innerHTML=`<div class="empty">데이터 없음</div>`;
+}
+function renderPicker(names){const el=document.getElementById("prodPicker");el.innerHTML="";
+  names.forEach((nm,i)=>{const ex=evAll().find(e=>e.name===nm);const b=document.createElement("button");b.className="pp"+(state.product===i?" on":"");
+    b.innerHTML=`<span class="brand-dot" style="background:${brandColor(ex.brand)}"></span>${esc(nm)}`;b.onclick=()=>{state.product=i;renderDetail(names);renderPicker(names);};el.appendChild(b);});}
+function polygon(cx,cy,r,vals){return vals.map((v,i)=>{const ang=-Math.PI/2+i*2*Math.PI/vals.length;const rr=r*(v-1)/4;return `${(cx+rr*Math.cos(ang)).toFixed(1)},${(cy+rr*Math.sin(ang)).toFixed(1)}`;}).join(" ");}
+function renderDetail(names){
+  const nm=names[state.product];const pe=evAll().filter(e=>e.name===nm);
+  const cx=150,cy=125,R=92,svg=document.getElementById("radar");
+  const grid=[1,2,3,4,5].map(g=>`<polygon points="${polygon(cx,cy,R,AXES.map(()=>g))}" fill="none" stroke="var(--line)"/>`).join("");
+  const spokes=AXES.map((a,i)=>{const ang=-Math.PI/2+i*2*Math.PI/AXES.length;return `<line x1="${cx}" y1="${cy}" x2="${(cx+R*Math.cos(ang)).toFixed(1)}" y2="${(cy+R*Math.sin(ang)).toFixed(1)}" stroke="var(--line)"/>`;}).join("");
+  const labels=AXES.map((a,i)=>{const ang=-Math.PI/2+i*2*Math.PI/AXES.length;const lx=cx+(R+20)*Math.cos(ang),ly=cy+(R+20)*Math.sin(ang);return `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="11" fill="var(--muted)">${esc(a.label)}</text>`;}).join("");
+  const allV=AXES.map(a=>avg(pe.map(e=>e.s[a.key]||0)));
+  svg.innerHTML=grid+spokes+`<polygon points="${polygon(cx,cy,R,allV)}" fill="color-mix(in srgb,var(--accent) 22%,transparent)" stroke="var(--accent)" stroke-width="2"/>`+labels;
+  document.getElementById("radarLegend").innerHTML=`<span class="lg"><i style="background:var(--accent)"></i>${esc(nm)} 평균</span><span class="lg" style="color:var(--faint)">n=${pe.length}</span>`;
+  // 축별 막대
+  let vb=`<p class="cap" style="margin:0 0 10px">${esc(nm)} · 축별 평균</p>`;
+  AXES.forEach(a=>{const v=avg(pe.map(e=>e.s[a.key]||0));vb+=`<div class="bar-row"><div>${esc(a.label)}</div><div class="bar-track"><div class="bar-fill" style="width:${v/5*100}%"></div></div><div class="bar-val">${f1(v)}</div></div>`;});
+  document.getElementById("votes").innerHTML=vb;
+}
+function renderOpinions(resp){
+  const el=document.getElementById("opinions");const texts=CFG.blocks.filter(b=>b.type==="text").map(b=>b.q);
+  const list=[];resp.forEach(r=>{texts.forEach(q=>{const v=(r.extras||{})[q];if(v&&v.trim()&&v!=="."&&v!=="-")list.push({t:v,meta:`${r.age} ${r.gender}`});});});
+  if(!list.length){el.innerHTML=`<div class="empty">의견 없음</div>`;return;}
+  el.innerHTML=list.slice(-10).reverse().map(o=>`<div class="op"><q>"${esc(o.t)}"</q><div class="op-meta">${esc(o.meta)}</div></div>`).join("");
+}
+function renderTally(resp){
+  const el=document.getElementById("tally");const blocks=CFG.blocks.filter(b=>(b.type==="price"||b.type==="choice"||(b.type==="module"&&b.opts)));
+  if(!blocks.length){el.innerHTML=`<div class="empty">집계 문항 없음</div>`;return;}
+  let h="";blocks.forEach(b=>{
+    const counts=b.opts.map(o=>resp.filter(r=>(r.extras||{})[b.q]===o).length);const max=Math.max(1,...counts);const win=counts.indexOf(Math.max(...counts));
+    h+=`<p class="cap" style="margin:0 0 8px">${esc(b.label)}</p>`;
+    b.opts.forEach((o,i)=>{h+=`<div class="bar-row"><div class="${i===win&&counts[i]>0?'winner':''}" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(o)}</div><div class="bar-track"><div class="bar-fill${i===win?'':' alt'}" style="width:${counts[i]/max*100}%"></div></div><div class="bar-val">${counts[i]}표</div></div>`;});
+    h+=`<div style="height:12px"></div>`;
+  });
+  el.innerHTML=h;
+}
+function exportCsv(){
+  if(!ROWS.length)return;
+  const prodBlocks=CFG.blocks.filter(b=>b.type==="product");
+  const extraQs=CFG.blocks.filter(b=>b.q).map(b=>b.q);
+  const head=["시간","성별","연령"];prodBlocks.forEach(p=>AXES.forEach(a=>head.push(`${p.name}_${a.label}`)));extraQs.forEach(q=>head.push(q));
+  const lines=[head.join(",")];
+  ROWS.forEach(r=>{const row=[r.created_at,r.gender,r.age];
+    prodBlocks.forEach(p=>{const it=(r.items||[]).find(x=>x.name===p.name)||{};AXES.forEach(a=>row.push(it[a.key]??""));});
+    extraQs.forEach(q=>{let v=(r.extras||{})[q]??"";v=String(v).replace(/"/g,'""');row.push(/[",\n]/.test(v)?`"${v}"`:v);});
+    lines.push(row.join(","));});
+  const blob=new Blob(["﻿"+lines.join("\n")],{type:"text/csv;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`${SLUG}_결과.csv`;a.click();
+}
+</script>
+</body>
+</html>

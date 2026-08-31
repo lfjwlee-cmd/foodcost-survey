@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QR 만들기</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;600;700&display=swap">
+<style>
+  body{font-family:"IBM Plex Sans KR",system-ui,sans-serif;background:#f3f2ef;color:#1d1b18;margin:0;padding:30px 18px;display:flex;justify-content:center}
+  .box{max-width:420px;width:100%;background:#fff;border:1px solid #e6e3dd;border-radius:16px;padding:24px;box-shadow:0 8px 24px -12px rgba(30,25,20,.14)}
+  h1{font-size:20px;margin:0 0 4px}p{color:#6f6b64;font-size:13px;margin:0 0 16px}
+  input{width:100%;padding:11px 12px;border:1px solid #d4d0c8;border-radius:10px;font-size:14px;font-family:inherit;margin-bottom:10px}
+  button{width:100%;padding:13px;background:#c1553a;color:#fff;border:none;border-radius:11px;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer}
+  #qr{display:flex;justify-content:center;margin-top:20px}
+  #qr canvas,#qr img{border:8px solid #fff;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.1)}
+  .hint{font-size:12px;color:#9a958d;margin-top:14px;line-height:1.6}
+  .url{word-break:break-all;font-size:12px;color:#6f6b64;margin-top:8px;text-align:center}
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>📱 응답 QR 만들기</h1>
+  <p>배포된 폼 주소를 넣고 QR을 만들어 인쇄·게시하세요. 폰 카메라로 찍으면 설문이 열립니다.</p>
+  <input id="url" placeholder="예) https://내설문.pages.dev/index.html" value="">
+  <button id="make">QR 만들기</button>
+  <div id="qr"></div>
+  <div class="url" id="urlEcho"></div>
+  <div class="hint">· 응답 폼: <b>index.html</b> 주소를 넣으세요.<br>· 결과 대시보드(<b>results.html</b>)는 사장·본부만 공유하세요.<br>· QR은 우클릭 → 이미지 저장으로 내려받을 수 있습니다.</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script>
+function draw(){
+  var u=document.getElementById("url").value.trim();if(!u)return;
+  var box=document.getElementById("qr");box.innerHTML="";
+  var c=document.createElement("canvas");box.appendChild(c);
+  QRCode.toCanvas(c,u,{width:260,margin:1,color:{dark:"#1d1b18",light:"#ffffff"}},function(e){if(e)box.innerHTML="<p style='color:#c0433a'>QR 생성 실패</p>";});
+  document.getElementById("urlEcho").textContent=u;
+}
+document.getElementById("make").onclick=draw;
+</script>
+</body>
+</html>

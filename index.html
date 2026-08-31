@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>신메뉴 시식 평가</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&display=swap">
+<style>
+  :root{
+    --bg:#ecebe7;--surface:#fff;--surface-2:#faf9f7;--field:#f4f2ee;
+    --ink:#1d1b18;--muted:#6f6b64;--faint:#9a958d;
+    --line:#e6e3dd;--line-strong:#d4d0c8;
+    --accent:#c1553a;--accent-ink:#fff;--accent-soft:#f3e2db;--good:#2f8f5b;--warn:#c9922b;--bad:#c0433a;
+    --shadow:0 1px 2px rgba(30,25,20,.04),0 10px 30px -14px rgba(30,25,20,.18);--r:15px;
+  }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --bg:#100f0e;--surface:#1d1b19;--surface-2:#181615;--field:#26231f;
+    --ink:#f0ede7;--muted:#a8a29a;--faint:#726d64;--line:#302d29;--line-strong:#413d37;
+    --accent:#e0755a;--accent-soft:#3a251e;--good:#4bb078;--warn:#e0ab48;--bad:#e0655b;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 32px -16px rgba(0,0,0,.7);
+  }}
+  :root[data-theme="dark"]{
+    --bg:#100f0e;--surface:#1d1b19;--surface-2:#181615;--field:#26231f;
+    --ink:#f0ede7;--muted:#a8a29a;--faint:#726d64;--line:#302d29;--line-strong:#413d37;
+    --accent:#e0755a;--accent-soft:#3a251e;--good:#4bb078;--warn:#e0ab48;--bad:#e0655b;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 32px -16px rgba(0,0,0,.7);
+  }
+  *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans KR",system-ui,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .phone{max-width:440px;margin:0 auto;background:var(--surface);min-height:100vh;box-shadow:var(--shadow);position:relative}
+  .pbar{position:sticky;top:0;z-index:20;height:4px;background:var(--line)}.pbar>i{display:block;height:100%;width:8%;background:var(--accent);transition:width .3s}
+  .hero{background:linear-gradient(160deg,var(--accent-soft),transparent 70%);padding:22px 20px 18px;border-bottom:1px solid var(--line)}
+  .brands{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+  .bpill{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;padding:4px 10px;border-radius:999px;color:#fff}
+  .hero h1{font-size:21px;font-weight:700;margin:0 0 6px;letter-spacing:-.01em;text-wrap:balance}
+  .hero p{font-size:13px;color:var(--muted);margin:0}
+  .meta-line{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--faint);margin-top:10px}
+  .rubric{margin:16px 20px 0;border:1px dashed var(--line-strong);border-radius:12px;overflow:hidden}
+  .rubric summary{list-style:none;cursor:pointer;padding:11px 14px;font-size:12.5px;font-weight:600;color:var(--accent);display:flex;align-items:center;gap:7px;background:var(--surface-2)}
+  .rubric summary::-webkit-details-marker{display:none}.rubric[open] summary{border-bottom:1px solid var(--line)}
+  .rubric .rb-body{padding:12px 14px;font-size:12px}
+  .rb-row{display:grid;grid-template-columns:56px 1fr;gap:8px;padding:5px 0;border-bottom:1px solid var(--line);align-items:baseline}.rb-row:last-child{border-bottom:none}
+  .rb-n{font-family:"IBM Plex Mono",monospace;font-weight:600}.rb-n.s5{color:var(--good)}.rb-n.s3{color:var(--warn)}.rb-n.s1{color:var(--bad)}
+  .rb-note{font-size:11px;color:var(--faint);margin-top:9px}
+  section.q{padding:20px;border-top:10px solid var(--bg)}section.q:first-of-type{border-top:none}
+  .q-num{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--faint);letter-spacing:.06em}
+  .prod-head{display:flex;align-items:center;gap:9px;margin:3px 0}.prod-head .bdot{width:9px;height:9px;border-radius:50%}.prod-head h2{font-size:18px;margin:0;font-weight:700}
+  .bname{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--faint)}
+  .qlabel{font-size:15px;font-weight:600;margin:2px 0 14px}.req{color:var(--accent);font-size:13px}
+  .axis{margin-bottom:14px}
+  .axis-name{font-size:13.5px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center}.axis-name .hint{font-size:11px;color:var(--faint)}
+  .scale{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+  .sbtn{border:1px solid var(--line-strong);background:var(--field);color:var(--muted);border-radius:10px;padding:11px 0;font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:600;cursor:pointer;transition:all .12s;text-align:center}
+  .sbtn:hover{border-color:var(--accent)}.sbtn.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);transform:translateY(-1px)}
+  .scale-ends{display:flex;justify-content:space-between;font-size:10.5px;color:var(--faint);margin-top:5px;font-family:"IBM Plex Mono",monospace}
+  .choices{display:flex;flex-direction:column;gap:8px}.choices.row{flex-direction:row}
+  .cbtn{flex:1;border:1px solid var(--line-strong);background:var(--field);color:var(--ink);border-radius:11px;padding:13px 14px;font-size:14px;cursor:pointer;font-family:inherit;text-align:left;transition:all .12s;display:flex;align-items:center;gap:9px}
+  .choices.row .cbtn{justify-content:center;text-align:center}.cbtn:hover{border-color:var(--accent)}.cbtn.on{border-color:var(--accent);background:var(--accent-soft);font-weight:600}
+  .cbtn .rd{width:16px;height:16px;border-radius:50%;border:2px solid var(--line-strong);flex-shrink:0}.cbtn.on .rd{border-color:var(--accent);background:radial-gradient(circle,var(--accent) 42%,transparent 46%)}
+  textarea{width:100%;border:1px solid var(--line-strong);background:var(--field);border-radius:11px;padding:12px 13px;font-family:inherit;font-size:14px;color:var(--ink);resize:vertical;min-height:74px}textarea:focus{outline:none;border-color:var(--accent)}
+  .optional-mod{border:1px solid var(--line);border-left:3px solid var(--good);border-radius:10px;background:var(--surface-2);padding:12px 14px}
+  .optional-mod .modtag{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--good);letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+  .submit-wrap{padding:22px 20px 40px}
+  .submit{width:100%;background:var(--accent);color:var(--accent-ink);border:none;border-radius:13px;padding:16px;font-size:16px;font-weight:700;font-family:inherit;cursor:pointer;box-shadow:var(--shadow)}
+  .submit:hover{filter:brightness(1.05)}.submit:disabled{opacity:.5;cursor:not-allowed}
+  .foot-note{text-align:center;font-size:11px;color:var(--faint);margin-top:14px;font-family:"IBM Plex Mono",monospace}
+  .err{color:var(--bad);font-size:13px;text-align:center;margin-top:10px;display:none}
+  .done{position:fixed;inset:0;background:var(--surface);display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px;z-index:40}
+  .done.show{display:flex}.done .em{font-size:52px;margin-bottom:14px}.done h2{font-size:22px;margin:0 0 8px}.done p{color:var(--muted);font-size:14px;margin:0 0 22px}
+  .done .again{background:var(--field);border:1px solid var(--line-strong);color:var(--muted);border-radius:10px;padding:10px 18px;font-size:13px;cursor:pointer;font-family:inherit}
+  .loading{padding:80px 24px;text-align:center;color:var(--muted)}
+  @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="pbar"><i id="pbar"></i></div>
+  <div id="app"><div class="loading">설문을 불러오는 중…</div></div>
+</div>
+<div class="done" id="done">
+  <div class="em">🙏</div><h2>평가 감사합니다!</h2>
+  <p>여러분의 한 표가 다음 신메뉴를<br>완성합니다.</p>
+  <button class="again" id="again">처음으로</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script>
+"use strict";
+let CFG=null, sb=null, AXES=[];
+const answers={scores:{}, extras:{}, gender:null, age:null};
+
+try{
+  const {SUPABASE_URL,SUPABASE_ANON_KEY}=window.SURVEY_CONFIG||{};
+  if(SUPABASE_URL && !SUPABASE_URL.includes("여기에")) sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+}catch(e){}
+
+function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
+
+fetch("questions.json").then(r=>r.json()).then(cfg=>{CFG=cfg;AXES=cfg.axes;renderForm();})
+  .catch(()=>{document.getElementById("app").innerHTML='<div class="loading">questions.json 을 불러오지 못했습니다.</div>';});
+
+function brandColor(name){const b=(CFG.meta.brands||[]).find(x=>x.name===name);return b?b.color:"var(--accent)";}
+
+function renderForm(){
+  const m=CFG.meta;
+  let h=`<div class="hero">
+    <div class="brands">${(m.brands||[]).map(b=>`<span class="bpill" style="background:${b.color}">${esc(b.name)}</span>`).join("")}</div>
+    <h1>${esc(m.title)}</h1><p>${esc(m.intro||"")}</p>
+    <div class="meta-line">⏱ ${esc(m.metaLine||"")}</div></div>`;
+  if(CFG.rubric&&CFG.rubric.length){
+    h+=`<details class="rubric"><summary>📖 점수 기준 보기 <span style="color:var(--faint);font-weight:400">(초반 참고용)</span></summary><div class="rb-body">`;
+    CFG.rubric.forEach(r=>h+=`<div class="rb-row"><span class="rb-n ${r.cls||''}">${esc(r.n)}</span><span>${esc(r.text)}</span></div>`);
+    h+=`<p class="rb-note">※ 다섯 축 모두 같은 기준입니다.</p></div></details>`;
+  }
+  h+=`<form id="form"><section class="q"><div class="q-num">Q1 · 응답자 정보</div>
+    <div class="qlabel">성별 <span class="req">*</span></div><div class="choices row" data-seg="gender">${CFG.segments.gender.map(v=>`<button type="button" class="cbtn" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div>
+    <div class="qlabel" style="margin-top:16px">연령대 <span class="req">*</span></div><div class="choices row" data-seg="age">${CFG.segments.age.map(v=>`<button type="button" class="cbtn" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div>
+    </section>`;
+  let n=2;
+  CFG.blocks.forEach(b=>{
+    if(b.type==="product"){
+      h+=`<section class="q"><div class="q-num">Q${n}</div>
+        <div class="prod-head"><span class="bdot" style="background:${brandColor(b.brand)}"></span><h2>${esc(b.name)}</h2></div>
+        <div class="prod-head" style="margin:-2px 0 14px 18px"><span class="bname">${esc(b.brand)} · ${esc(b.tag||"")}</span></div>`;
+      AXES.forEach(a=>{
+        h+=`<div class="axis"><div class="axis-name"><span>${esc(a.label)} <span class="req">*</span></span><span class="hint">${esc(a.hint||"")}</span></div>
+          <div class="scale" data-prod="${esc(b.name)}" data-axis="${a.key}">${[5,4,3,2,1].map(x=>`<button type="button" class="sbtn" data-v="${x}">${x}</button>`).join("")}</div>
+          <div class="scale-ends"><span>매우 좋음</span><span>매우 아쉬움</span></div></div>`;
+      });
+      h+=`</section>`;
+    } else if(b.type==="price"||b.type==="choice"){
+      h+=`<section class="q"><div class="q-num">Q${n}</div><div class="qlabel">${esc(b.label)} <span class="req">*</span></div>
+        <div class="choices ${b.row?'row':''}" data-extra="${b.q}">${b.opts.map(o=>`<button type="button" class="cbtn" data-v="${esc(o)}"><span class="rd"></span>${esc(o)}</button>`).join("")}</div></section>`;
+    } else if(b.type==="text"){
+      h+=`<section class="q"><div class="q-num">Q${n}</div><div class="qlabel">${esc(b.label)}</div><textarea data-extra="${b.q}" placeholder="${esc(b.ph||"")}"></textarea></section>`;
+    } else if(b.type==="module"){
+      h+=`<section class="q"><div class="q-num">Q${n}</div><div class="optional-mod"><span class="modtag">◎ 선택 · ${esc(b.tag||"")}</span><div class="qlabel" style="margin:8px 0 12px">${esc(b.label)}</div>`;
+      if(b.opts) h+=`<div class="choices row" data-extra="${b.q}">${b.opts.map(o=>`<button type="button" class="cbtn" data-v="${esc(o)}">${esc(o)}</button>`).join("")}</div>`;
+      else h+=`<textarea data-extra="${b.q}" placeholder="${esc(b.ph||"")}"></textarea>`;
+      h+=`</div></section>`;
+    }
+    n++;
+  });
+  h+=`<div class="submit-wrap"><button type="submit" class="submit" id="submitBtn">평가 제출하기</button>
+    <p class="err" id="err"></p><p class="foot-note">인생푸드 · 응답은 자동으로 누적됩니다</p></div></form>`;
+  document.getElementById("app").innerHTML=h;
+  wire();
+}
+
+function wire(){
+  document.querySelectorAll(".scale").forEach(sc=>sc.querySelectorAll(".sbtn").forEach(btn=>btn.onclick=()=>{
+    sc.querySelectorAll(".sbtn").forEach(x=>x.classList.remove("on"));btn.classList.add("on");
+    (answers.scores[sc.dataset.prod]=answers.scores[sc.dataset.prod]||{})[sc.dataset.axis]=+btn.dataset.v;prog();
+  }));
+  document.querySelectorAll("[data-seg]").forEach(ch=>ch.querySelectorAll(".cbtn").forEach(btn=>btn.onclick=()=>{
+    ch.querySelectorAll(".cbtn").forEach(x=>x.classList.remove("on"));btn.classList.add("on");answers[ch.dataset.seg]=btn.dataset.v;prog();
+  }));
+  document.querySelectorAll(".choices[data-extra]").forEach(ch=>ch.querySelectorAll(".cbtn").forEach(btn=>btn.onclick=()=>{
+    ch.querySelectorAll(".cbtn").forEach(x=>x.classList.remove("on"));btn.classList.add("on");answers.extras[ch.dataset.extra]=btn.dataset.v;prog();
+  }));
+  document.querySelectorAll("textarea[data-extra]").forEach(t=>t.oninput=()=>{answers.extras[t.dataset.extra]=t.value;});
+  document.getElementById("form").onsubmit=submit;
+  document.getElementById("again").onclick=()=>{location.reload();};
+}
+
+function requiredCount(){
+  let c=2; // gender, age
+  CFG.blocks.forEach(b=>{if(b.type==="product")c+=AXES.length;if(b.type==="price"||b.type==="choice")c++;});
+  return c;
+}
+function doneCount(){
+  let c=0; if(answers.gender)c++; if(answers.age)c++;
+  CFG.blocks.forEach(b=>{
+    if(b.type==="product"){const s=answers.scores[b.name]||{};c+=AXES.filter(a=>s[a.key]).length;}
+    if((b.type==="price"||b.type==="choice")&&answers.extras[b.q])c++;
+  });
+  return c;
+}
+function prog(){document.getElementById("pbar").style.width=Math.min(100,6+doneCount()/requiredCount()*94)+"%";}
+
+function firstMissing(){
+  if(!answers.gender)return "성별을 선택해 주세요";
+  if(!answers.age)return "연령대를 선택해 주세요";
+  for(const b of CFG.blocks){
+    if(b.type==="product"){const s=answers.scores[b.name]||{};for(const a of AXES)if(!s[a.key])return `'${b.name}'의 ${a.label} 점수를 선택해 주세요`;}
+    if((b.type==="price"||b.type==="choice")&&!answers.extras[b.q])return `'${b.label}'을(를) 선택해 주세요`;
+  }
+  return null;
+}
+
+async function submit(e){
+  e.preventDefault();
+  const err=document.getElementById("err"),btn=document.getElementById("submitBtn");
+  const miss=firstMissing();
+  if(miss){err.textContent="⚠ "+miss;err.style.display="block";return;}
+  err.style.display="none";
+  const items=CFG.blocks.filter(b=>b.type==="product").map(b=>({brand:b.brand,name:b.name,cat:b.cat||"",...answers.scores[b.name]}));
+  const payload={survey_slug:CFG.slug||"default",gender:answers.gender,age:answers.age,items,extras:answers.extras};
+  if(!sb){ // 데모/키 미설정 시에도 완료 화면
+    console.warn("Supabase 미설정 — 저장 생략",payload);
+    document.getElementById("done").classList.add("show");return;
+  }
+  btn.disabled=true;btn.textContent="제출 중…";
+  const {error}=await sb.from("svy_responses").insert(payload);
+  if(error){err.textContent="⚠ 저장 실패: "+error.message;err.style.display="block";btn.disabled=false;btn.textContent="평가 제출하기";return;}
+  document.getElementById("done").classList.add("show");
+}
+</script>
+</body>
+</html>

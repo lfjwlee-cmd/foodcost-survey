@@ -1,0 +1,43 @@
+{
+  "slug": "2026-08-시식",
+  "meta": {
+    "title": "신메뉴 시식 평가",
+    "brands": [
+      { "name": "삼대미역",   "color": "#2f8f5b" },
+      { "name": "인생아구찜", "color": "#c1553a" }
+    ],
+    "intro": "오늘 시식하신 메뉴를 느끼신 그대로 평가해 주세요. 응답은 메뉴 개선·출시 결정에 소중히 반영됩니다.",
+    "metaLine": "약 3분 · 익명 · 5점(매우 좋음) ~ 1점(매우 아쉬움)"
+  },
+  "axes": [
+    { "key": "taste",   "label": "맛",     "hint": "전반적인 맛" },
+    { "key": "aroma",   "label": "향·풍미", "hint": "냄새·맛의 깊이" },
+    { "key": "look",    "label": "모양새",  "hint": "색·플레이팅" },
+    { "key": "texture", "label": "식감",    "hint": "씹는 느낌" },
+    { "key": "portion", "label": "제공량",  "hint": "가격 대비 양" }
+  ],
+  "rubric": [
+    { "n": "5점", "cls": "s5", "text": "매우 좋음 — 맛·완성도가 뛰어나 그대로 출시해도 좋음" },
+    { "n": "4점", "cls": "",   "text": "좋음 — 만족스럽고 큰 보완 없이 판매 가능" },
+    { "n": "3점", "cls": "s3", "text": "보통 — 무난, 특별하지도 나쁘지도 않음" },
+    { "n": "2점", "cls": "",   "text": "아쉬움 — 눈에 띄는 약점, 보완 필요" },
+    { "n": "1점", "cls": "s1", "text": "매우 아쉬움 — 거부감/재작업 필요" }
+  ],
+  "segments": {
+    "gender": ["남", "여"],
+    "age": ["20대", "30대", "40대 이상"]
+  },
+  "blocks": [
+    { "type": "product", "brand": "삼대미역",   "name": "들깨미역칼국수", "tag": "칼국수 · 기본", "cat": "칼국수" },
+    { "type": "product", "brand": "삼대미역",   "name": "얼큰칼국수",     "tag": "칼국수 · 얼큰", "cat": "칼국수" },
+    { "type": "price",   "q": "kalPrice",  "label": "칼국수 판매가로 적정한 금액은?", "opts": ["10,000원", "11,000원", "12,000원"] },
+    { "type": "text",    "q": "kalOpinion","label": "칼국수 종합 의견", "ph": "예) 얼큰 버전이 해장으로 좋았어요" },
+    { "type": "product", "brand": "인생아구찜", "name": "부드러운 계란찜", "tag": "계란찜 · A", "cat": "계란찜" },
+    { "type": "product", "brand": "인생아구찜", "name": "폭탄 계란찜",     "tag": "계란찜 · B", "cat": "계란찜" },
+    { "type": "choice",  "q": "eggPref",   "label": "두 계란찜 중 더 선호하는 것은?", "opts": ["부드러운 계란찜", "폭탄 계란찜"], "row": true },
+    { "type": "price",   "q": "eggPrice",  "label": "계란찜 판매가로 적정한 금액은?", "opts": ["3,000원", "4,000원", "5,000원"] },
+    { "type": "text",    "q": "eggOpinion","label": "계란찜 종합 의견", "ph": "예) 부드러운 쪽이 매운 음식과 잘 맞아요" },
+    { "type": "module",  "q": "nameSuggest","label": "이 계란찜에 어울리는 이름을 추천해 주세요", "input": "text", "ph": "예) 인생미니계란찜", "tag": "네이밍 추천 · 1차 전용" },
+    { "type": "module",  "q": "dishColor", "label": "어울리는 그릇 색상은?", "opts": ["금색", "은색"], "tag": "그릇 추천 · 1차 전용" }
+  ]
+}
