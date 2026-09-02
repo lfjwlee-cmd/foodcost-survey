@@ -248,6 +248,14 @@ async function loadActiveSurvey(){
 }
 loadActiveSurvey();
 
+/* 관리자 모드: 주소에 #admin 이 있을 때만 결과·관리 탭 노출. QR(일반 주소) 응답자는 응답 폼만 봄 */
+function applyAdminVisibility(){
+  const adm=/admin|manage/i.test(location.hash+location.search);
+  const sg=document.querySelector(".topbar .seg"); if(sg) sg.classList.toggle("hidden",!adm);
+}
+applyAdminVisibility();
+window.addEventListener("hashchange",applyAdminVisibility);
+
 /* view switch */
 let view="form";
 function setView(v){
@@ -556,24 +564,24 @@ function renderSurveyList(){
 function renderBrandList(){
   const el=$("brandList"); if(!el)return;
   if(!BRANDS_REG.length){ el.innerHTML=`<div class="empty" style="padding:12px">등록된 브랜드가 없습니다. 위 버튼으로 등록하세요.</div>`; return; }
-  el.innerHTML=BRANDS_REG.map(b=>`<div class="srow"><div class="si" style="display:flex;align-items:center;gap:10px"><span class="brand-dot" style="width:15px;height:15px;background:${esc(b.color)}"></span><div><b>${esc(b.name)}</b><span>${esc(b.note||'')}</span></div></div>
+  el.innerHTML=BRANDS_REG.map(b=>`<div class="srow"><div class="si" style="display:flex;align-items:center;gap:10px"><span class="brand-dot" style="width:15px;height:15px;background:${esc(b.color)}"></span><b style="font-size:14.5px">${esc(b.name)}</b></div>
     <div class="arow-actions"><input type="color" class="acolor" value="${esc(b.color)}" data-name="${esc(b.name)}" title="색 변경"><button class="abtn" data-del="${esc(b.name)}">삭제</button></div></div>`).join("");
   el.querySelectorAll("input[type=color]").forEach(inp=>inp.onchange=async e=>{ try{ await sb.from("svy_brands").update({color:e.target.value}).eq("name",e.target.dataset.name);}catch(x){} await loadBrands(); renderBrandList(); if(ed)renderProductRows(); });
   el.querySelectorAll("[data-del]").forEach(b=>b.onclick=async ()=>{ if(!confirm(`'${b.dataset.del}' 브랜드를 삭제할까요? (이미 저장된 설문에는 영향 없음)`))return; try{ await sb.from("svy_brands").delete().eq("name",b.dataset.del);}catch(x){} await loadBrands(); renderBrandList(); if(ed)renderProductRows(); });
 }
 async function addBrand(){
   const name=prompt("새 브랜드 이름 (예: 어화락)"); if(!name||!name.trim())return;
-  const note=prompt("한 줄 설명 (예: 화덕생선구이) — 없으면 비워두세요")||"";
   const palette=["#c1553a","#2f8f5b","#3a6ea5","#c9922b","#7d5ba6","#4a9d9c"];
   const color=palette[BRANDS_REG.length%palette.length];
-  try{ const {error}=await sb.from("svy_brands").upsert({name:name.trim(),color,note:note.trim(),sort:BRANDS_REG.length+1}); if(error){alert("등록 실패: "+error.message);return;} }catch(x){alert("등록 실패");return;}
+  try{ const {error}=await sb.from("svy_brands").upsert({name:name.trim(),color,note:"",sort:BRANDS_REG.length+1}); if(error){alert("등록 실패: "+error.message);return;} }catch(x){alert("등록 실패");return;}
   await loadBrands(); renderBrandList(); if(ed)renderProductRows();
 }
 function renderQR(){
   const url=location.origin+location.pathname;
-  $("qrArea").innerHTML=`<div class="fld"><label>응답 주소 (이 QR을 찍으면 응답 폼이 열립니다)</label><input id="qrUrl" value="${esc(url)}"></div>
+  $("qrArea").innerHTML=`<div class="fld"><label>응답 주소 (이 QR을 찍으면 응답 폼이 열립니다 · 응답자는 결과·관리 탭이 안 보임)</label><input id="qrUrl" value="${esc(url)}"></div>
     <button class="abtn primary" id="qrGen">QR 만들기</button><div class="qrbox" id="qrbox"></div>
-    <p style="font-size:11.5px;color:var(--faint);margin-top:2px">QR을 우클릭 → 이미지 저장으로 인쇄·게시하세요.</p>`;
+    <p style="font-size:11.5px;color:var(--faint);margin-top:2px">QR을 우클릭 → 이미지 저장으로 인쇄·게시하세요.</p>
+    <p style="font-size:11.5px;color:var(--muted);margin-top:10px;padding:9px 11px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px">🔑 <b>관리자 주소(사장·본부용)</b> — 결과·관리 탭은 이 주소로만 보입니다. 북마크 해두세요:<br><span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--accent);user-select:all;word-break:break-all">${esc(url)}#admin</span></p>`;
   $("qrGen").onclick=()=>{const u=$("qrUrl").value.trim();if(!u)return;$("qrbox").innerHTML=`<img width="230" height="230" alt="QR" src="https://api.qrserver.com/v1/create-qr-code/?size=500x500&margin=16&data=${encodeURIComponent(u)}">`;};
 }
 function suggestSlug(){const d=new Date();const base=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-시식";let s=base,n=1;while(SURVEYS.some(x=>x.slug===s)){n++;s=base+"-"+n;}return s;}
@@ -702,9 +710,10 @@ async function saveDraft(activate){
   else if(draftIsNew){ up.is_open=false; }
   const {error}=await sb.from("svy_surveys").upsert(up);
   if(error){alert("저장 실패: "+error.message);return;}
-  draft=null;ed=null; await loadSurveys(); renderAdmin();
-  if(activate) loadActiveSurvey();
-  alert(activate?"저장하고 응답 폼에 활성화했습니다.":"저장했습니다.");
+  draft=null;ed=null;
+  if(activate) await loadActiveSurvey();
+  await loadSurveys(); renderAdmin();
+  alert(activate?"저장하고 응답 폼에 활성화했습니다. (응답하기 탭에 반영됨)":"저장했습니다.");
 }
 </script>
 </body>
