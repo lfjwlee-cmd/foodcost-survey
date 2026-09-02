@@ -125,6 +125,31 @@
   .lock button{width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer}
   .lock .lerr{color:var(--bad);font-size:12.5px;margin-top:10px;min-height:16px}
   .banner{background:color-mix(in srgb,var(--warn) 14%,transparent);border:1px solid var(--warn);color:var(--warn);border-radius:10px;padding:11px 14px;font-size:12.5px;margin-bottom:16px;display:none}
+  .dbtn{background:var(--surface);border:1px solid var(--line-strong);color:var(--muted);border-radius:9px;padding:7px 11px;font-size:12.5px;cursor:pointer;font-family:inherit}
+  .dbtn:hover{border-color:var(--accent);color:var(--ink)}select.dbtn{padding:6px 8px;max-width:150px}
+  .admin{max-width:760px}
+  .admin>h1{font-size:20px;margin:4px 0 2px}
+  .acard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:16px 18px;margin-bottom:14px}
+  .acard h3{font-size:14px;margin:0 0 12px;font-weight:600;overflow:hidden}
+  .srow{display:flex;align-items:center;gap:8px;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);font-size:13.5px}.srow:last-child{border-bottom:none}
+  .srow .si b{font-weight:600}.srow .si span{display:block;font-size:11.5px;color:var(--faint);margin-top:2px}
+  .active-badge{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--good);border:1px solid var(--good);border-radius:999px;padding:2px 7px;margin-left:6px;white-space:nowrap}
+  .abtn{border:1px solid var(--line-strong);background:var(--surface-2);color:var(--muted);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap}
+  .abtn:hover{color:var(--ink);border-color:var(--accent)}
+  .abtn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}.abtn.primary:hover{color:#fff;filter:brightness(1.05)}
+  .abtn.ghost{background:none;font-weight:400}
+  .arow-actions{display:flex;gap:6px;flex-shrink:0}
+  .fld{margin-bottom:13px}.fld>label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;font-weight:500}
+  .fld input,.fld textarea,.fld select{width:100%;border:1px solid var(--line-strong);background:var(--field);border-radius:9px;padding:9px 11px;font-family:inherit;font-size:13.5px;color:var(--ink)}
+  .fld input:focus,.fld textarea:focus{outline:none;border-color:var(--accent)}
+  .erow{display:grid;gap:6px;align-items:center;margin-bottom:7px}
+  .erow input,.erow select{border:1px solid var(--line-strong);background:var(--field);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:13px;color:var(--ink);min-width:0}
+  .erow .del{border:1px solid var(--line-strong);background:var(--surface-2);color:var(--bad);border-radius:8px;cursor:pointer;font-size:16px;line-height:1;padding:0}
+  input.acolor{padding:3px!important;height:36px;cursor:pointer}
+  .addbtn{border:1px dashed var(--line-strong);background:none;color:var(--muted);border-radius:8px;padding:8px 12px;font-size:12.5px;cursor:pointer;font-family:inherit;margin-top:4px}
+  .addbtn:hover{color:var(--accent);border-color:var(--accent)}
+  .qrbox{text-align:center;padding:12px 0 4px}.qrbox img{border:10px solid #fff;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12)}
+  .asaved{color:var(--good);font-size:12.5px;align-self:center}
   .hidden{display:none!important}
   @media(max-width:820px){.kpis{grid-template-columns:repeat(2,1fr)}.g2{grid-template-columns:1fr}.dash-head h1{font-size:19px}}
   @media(prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -135,6 +160,7 @@
   <div class="seg">
     <button id="tabForm" class="on">📝 응답하기</button>
     <button id="tabRes">📊 결과 보기</button>
+    <button id="tabAdmin">⚙️ 관리</button>
   </div>
   <button class="theme-btn" id="themeBtn">◐</button>
 </div>
@@ -162,7 +188,7 @@
   <div id="dash" class="wrap hidden">
     <div class="dash-head">
       <div><h1>시식 평가 결과</h1><div class="sub" id="dsub">집계 중…</div></div>
-      <div style="display:flex;gap:8px;align-items:center"><span class="live"><i></i> 실시간</span><button class="dbtn" id="csvBtn">CSV</button></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="live"><i></i> 실시간</span><select class="dbtn" id="roundSel" title="시식 회차"></select><button class="dbtn" id="csvBtn">CSV</button></div>
     </div>
     <div class="banner" id="cfgBanner">⚠ Supabase 키가 설정되지 않았습니다.</div>
     <div class="filters"><div class="filter-row">
@@ -172,6 +198,17 @@
     </div></div>
     <div id="dbody"><div class="empty">데이터 대기 중…</div></div>
   </div>
+</div>
+
+<div id="adminView" class="hidden">
+  <div id="adminLock" class="lock">
+    <div class="lk">🔒</div><h2>관리</h2>
+    <p>사장·본부 전용입니다. 비밀번호를 입력하세요.</p>
+    <input id="alockInput" type="password" placeholder="비밀번호" autocomplete="off">
+    <button id="alockBtn">열기</button>
+    <div class="lerr" id="alockErr"></div>
+  </div>
+  <div id="adminBody" class="wrap admin hidden"><div class="empty">불러오는 중…</div></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -186,8 +223,22 @@ const esc=v=>String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&
 const brandColor=n=>{const b=(CFG.meta.brands||[]).find(x=>x.name===n);return b?b.color:"var(--accent)";};
 const brandList=()=>(CFG.meta.brands||[]).map(b=>b.name);
 
-fetch("questions.json").then(r=>r.json()).then(cfg=>{CFG=cfg;AXES=cfg.axes;renderForm();buildFilters();})
-  .catch(()=>{$("app").innerHTML='<div class="empty">questions.json 을 불러오지 못했습니다.</div>';});
+async function loadActiveSurvey(){
+  let cfg=null;
+  if(sb){
+    try{
+      const {data}=await sb.from("svy_surveys").select("*").eq("is_open",true).order("created_at",{ascending:false}).limit(1);
+      if(data&&data.length){ cfg=data[0].config; cfg.slug=data[0].slug; }
+    }catch(e){}
+  }
+  if(!cfg){
+    try{ cfg=await fetch("questions.json").then(r=>r.json()); }
+    catch(e){ $("app").innerHTML='<div class="empty">설문을 불러오지 못했습니다.</div>'; return; }
+    if(sb){ try{ await sb.from("svy_surveys").upsert({slug:cfg.slug,title:cfg.meta.title,config:cfg,is_open:true}); }catch(e){} }
+  }
+  CFG=cfg; AXES=cfg.axes; renderForm(); buildFilters();
+}
+loadActiveSurvey();
 
 /* view switch */
 let view="form";
@@ -195,12 +246,24 @@ function setView(v){
   view=v;
   $("tabForm").classList.toggle("on",v==="form");
   $("tabRes").classList.toggle("on",v==="results");
+  $("tabAdmin").classList.toggle("on",v==="admin");
   $("formView").classList.toggle("hidden",v!=="form");
   $("resView").classList.toggle("hidden",v!=="results");
+  $("adminView").classList.toggle("hidden",v!=="admin");
   if(v==="results"){ if(unlocked){ startDash(); } else { setTimeout(()=>$("lockInput").focus(),50); } }
+  if(v==="admin"){ if(unlocked){ $("adminLock").classList.add("hidden");$("adminBody").classList.remove("hidden");openAdmin(); } else { setTimeout(()=>$("alockInput").focus(),50); } }
 }
 $("tabForm").onclick=()=>setView("form");
 $("tabRes").onclick=()=>setView("results");
+$("tabAdmin").onclick=()=>setView("admin");
+function tryUnlockAdmin(){
+  const key=(CONF.RESULTS_KEY||"").toString();const v=$("alockInput").value.trim();
+  if(key && v!==key){ $("alockErr").textContent="비밀번호가 올바르지 않습니다."; return; }
+  unlocked=true; try{sessionStorage.setItem("svy_unlocked","1");}catch(e){}
+  $("adminLock").classList.add("hidden");$("adminBody").classList.remove("hidden");openAdmin();
+}
+$("alockBtn").onclick=tryUnlockAdmin;
+$("alockInput").addEventListener("keydown",e=>{if(e.key==="Enter")tryUnlockAdmin();});
 $("themeBtn").onclick=()=>{const c=document.documentElement.getAttribute("data-theme");const n=c==="dark"?"light":(c==="light"?"dark":(matchMedia("(prefers-color-scheme: dark)").matches?"light":"dark"));document.documentElement.setAttribute("data-theme",n);};
 
 /* ===== FORM ===== */
@@ -291,19 +354,26 @@ $("lockInput").addEventListener("keydown",e=>{if(e.key==="Enter")tryUnlock();});
 try{ if(sessionStorage.getItem("svy_unlocked")==="1"){ unlocked=true; } }catch(e){}
 
 /* ===== DASHBOARD ===== */
-let ROWS=[],timer=null,dashStarted=false;
+let ROWS=[],timer=null,dashStarted=false,viewSlug=null;
 const dstate={brand:"전체",age:"전체",gender:"전체",product:0};
 function startDash(){
   $("lockPanel").classList.add("hidden");$("dash").classList.remove("hidden");
   if(!sb){$("cfgBanner").style.display="block";}
-  if(dashStarted){renderDash();return;}
-  dashStarted=true;
-  loadDash(); if(timer)clearInterval(timer); timer=setInterval(loadDash,15000);
-  $("csvBtn").onclick=exportCsv;
+  if(!dashStarted){ dashStarted=true; if(timer)clearInterval(timer); timer=setInterval(loadDash,15000); $("csvBtn").onclick=exportCsv; }
+  populateRounds(); loadDash();
+}
+async function populateRounds(){
+  const sel=$("roundSel"); if(!sel||!sb)return;
+  let slugs=[];
+  try{ const {data}=await sb.from("svy_responses").select("survey_slug"); slugs=[...new Set((data||[]).map(r=>r.survey_slug))]; }catch(e){}
+  const cur=CFG.slug||"default"; if(!slugs.includes(cur))slugs.unshift(cur);
+  sel.innerHTML=slugs.map(s=>`<option value="${esc(s)}" ${((viewSlug||cur)===s)?'selected':''}>${esc(s)}</option>`).join("");
+  sel.onchange=()=>{viewSlug=sel.value;loadDash();};
 }
 async function loadDash(){
   if(!sb){renderDash();return;}
-  const {data,error}=await sb.from("svy_responses").select("*").eq("survey_slug",CFG.slug||"default").order("created_at",{ascending:true});
+  const slug=viewSlug||CFG.slug||"default";
+  const {data,error}=await sb.from("svy_responses").select("*").eq("survey_slug",slug).order("created_at",{ascending:true});
   if(error){$("dbody").innerHTML=`<div class="empty">불러오기 실패: ${esc(error.message)}</div>`;return;}
   ROWS=data||[];renderDash();
 }
@@ -322,7 +392,7 @@ function buildFilters(){
 }
 function renderDash(){
   buildFilters();
-  $("dsub").textContent=`${CFG.slug} · 총 ${ROWS.length}명 응답`;
+  $("dsub").textContent=`${viewSlug||CFG.slug} · 총 ${ROWS.length}명 응답`;
   if(!ROWS.length){$("dbody").innerHTML=`<div class="empty">아직 응답이 없습니다.<br>「📝 응답하기」에서 첫 응답을 넣거나 QR을 공유하세요.</div>`;return;}
   const ev=evF(),resp=rowsF();const names=[...new Set(evAll().map(e=>e.name))];
   $("dbody").innerHTML=`<div class="kpis" id="kpis"></div><div class="insight" id="insight"></div>
@@ -398,7 +468,134 @@ function exportCsv(){
     prodBlocks.forEach(p=>{const it=(r.items||[]).find(x=>x.name===p.name)||{};AXES.forEach(a=>row.push(it[a.key]??""));});
     extraQs.forEach(q=>{let v=(r.extras||{})[q]??"";v=String(v).replace(/"/g,'""');row.push(/[",\n]/.test(v)?`"${v}"`:v);});
     lines.push(row.join(","));});
-  const blob=new Blob(["﻿"+lines.join("\n")],{type:"text/csv;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`${CFG.slug||"설문"}_결과.csv`;a.click();
+  const blob=new Blob(["﻿"+lines.join("\n")],{type:"text/csv;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`${viewSlug||CFG.slug||"설문"}_결과.csv`;a.click();
+}
+
+/* ===== 관리자: 설문 편집 · 회차 · QR ===== */
+let SURVEYS=[],RESP_COUNTS={},draft=null,ed=null,draftIsNew=false;
+async function openAdmin(){ await loadSurveys(); renderAdmin(); }
+async function loadSurveys(){
+  SURVEYS=[];RESP_COUNTS={}; if(!sb)return;
+  try{ const {data}=await sb.from("svy_surveys").select("*").order("created_at",{ascending:false}); SURVEYS=data||[]; }catch(e){}
+  try{ const {data}=await sb.from("svy_responses").select("survey_slug"); (data||[]).forEach(r=>{RESP_COUNTS[r.survey_slug]=(RESP_COUNTS[r.survey_slug]||0)+1;}); }catch(e){}
+}
+function renderAdmin(){
+  const body=$("adminBody");
+  if(!sb){ body.innerHTML='<div class="empty">서버(Supabase) 연결이 필요합니다.</div>'; return; }
+  let h=`<h1>⚙️ 설문 관리</h1><p style="color:var(--muted);font-size:13px;margin:0 0 16px"><b>저장 &amp; 활성화</b>하면 응답 폼에 바로 반영됩니다. 지난 회차·응답은 그대로 보관됩니다.</p>`;
+  h+=`<div class="acard"><h3>시식 회차 <button class="abtn primary" id="btnNew" style="float:right">+ 새 시식 만들기</button></h3><div id="surveyList"></div></div>`;
+  h+=`<div class="acard"><h3>📱 응답 QR</h3><div id="qrArea"></div></div>`;
+  h+=`<div id="editorArea"></div>`;
+  body.innerHTML=h; $("btnNew").onclick=startNew; renderSurveyList(); renderQR();
+  if(draft&&ed) renderEditor();
+}
+function renderSurveyList(){
+  const el=$("surveyList");
+  if(!SURVEYS.length){ el.innerHTML=`<div class="empty" style="padding:14px">저장된 회차가 없습니다. 새 시식을 만들어 보세요.</div>`; return; }
+  el.innerHTML=SURVEYS.map(s=>{const cnt=RESP_COUNTS[s.slug]||0;
+    return `<div class="srow"><div class="si"><b>${esc(s.title||s.slug)}</b>${s.is_open?'<span class="active-badge">응답 폼에 활성</span>':''}<span>${esc(s.slug)} · 응답 ${cnt}명 · ${(s.created_at||'').slice(0,10)}</span></div>
+      <div class="arow-actions"><button class="abtn" data-act="edit" data-slug="${esc(s.slug)}">편집</button>${s.is_open?'':`<button class="abtn" data-act="act" data-slug="${esc(s.slug)}">활성화</button>`}<button class="abtn" data-act="res" data-slug="${esc(s.slug)}">결과</button></div></div>`;}).join("");
+  el.querySelectorAll("[data-act]").forEach(b=>b.onclick=()=>{const slug=b.dataset.slug;
+    if(b.dataset.act==="edit")editSurvey(slug); else if(b.dataset.act==="act")activateSurvey(slug); else {viewSlug=slug;setView("results");}});
+}
+function renderQR(){
+  const url=location.origin+location.pathname;
+  $("qrArea").innerHTML=`<div class="fld"><label>응답 주소 (이 QR을 찍으면 응답 폼이 열립니다)</label><input id="qrUrl" value="${esc(url)}"></div>
+    <button class="abtn primary" id="qrGen">QR 만들기</button><div class="qrbox" id="qrbox"></div>
+    <p style="font-size:11.5px;color:var(--faint);margin-top:2px">QR을 우클릭 → 이미지 저장으로 인쇄·게시하세요.</p>`;
+  $("qrGen").onclick=()=>{const u=$("qrUrl").value.trim();if(!u)return;$("qrbox").innerHTML=`<img width="230" height="230" alt="QR" src="https://api.qrserver.com/v1/create-qr-code/?size=500x500&margin=16&data=${encodeURIComponent(u)}">`;};
+}
+function suggestSlug(){const d=new Date();const base=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-시식";let s=base,n=1;while(SURVEYS.some(x=>x.slug===s)){n++;s=base+"-"+n;}return s;}
+function startNew(){
+  const base=((SURVEYS.find(s=>s.is_open)||SURVEYS[0]||{}).config)||CFG;
+  draft=JSON.parse(JSON.stringify(base)); draft.slug=suggestSlug(); draftIsNew=true; buildEditModel(); renderAdmin();
+  setTimeout(()=>{const e=$("editorArea");if(e)e.scrollIntoView({behavior:"smooth"});},60);
+}
+function editSurvey(slug){
+  const s=SURVEYS.find(x=>x.slug===slug); if(!s)return;
+  draft=JSON.parse(JSON.stringify(s.config)); draft.slug=s.slug; draftIsNew=false; buildEditModel(); renderAdmin();
+  setTimeout(()=>{const e=$("editorArea");if(e)e.scrollIntoView({behavior:"smooth"});},60);
+}
+async function activateSurvey(slug){
+  if(!sb)return;
+  try{ await sb.from("svy_surveys").update({is_open:false}).neq("slug",slug); await sb.from("svy_surveys").update({is_open:true}).eq("slug",slug); }
+  catch(e){ alert("활성화 실패: "+e.message); return; }
+  await loadSurveys(); renderAdmin(); loadActiveSurvey();
+}
+function buildEditModel(){
+  const products=draft.blocks.filter(b=>b.type==="product").map(b=>({brand:b.brand,name:b.name,tag:b.tag||""}));
+  const extras=draft.blocks.filter(b=>b.type!=="product").map(b=>({type:b.type,q:b.q,label:b.label||"",opts:(b.opts||[]).join(", "),input:b.input||"",ph:b.ph||""}));
+  ed={slug:draft.slug,title:(draft.meta&&draft.meta.title)||"",intro:(draft.meta&&draft.meta.intro)||"",brands:((draft.meta&&draft.meta.brands)||[]).map(b=>({name:b.name,color:b.color||"#c1553a"})),products,extras};
+}
+function renderEditor(){
+  const el=$("editorArea");
+  let h=`<div class="acard"><h3>${draftIsNew?'새 시식 만들기':'회차 편집'} <button class="abtn ghost" id="edCancel" style="float:right">닫기</button></h3>`;
+  h+=`<div class="fld"><label>회차 ID</label><input id="ed_slug" value="${esc(ed.slug)}" ${draftIsNew?'':'readonly style="opacity:.6"'}></div>`;
+  h+=`<div class="fld"><label>제목</label><input id="ed_title" value="${esc(ed.title)}"></div>`;
+  h+=`<div class="fld"><label>소개 문구</label><textarea id="ed_intro" rows="2">${esc(ed.intro)}</textarea></div>`;
+  h+=`<div class="fld"><label>브랜드 (이름 · 색)</label><div id="ed_brands"></div><button class="addbtn" id="addBrand">+ 브랜드</button></div>`;
+  h+=`<div class="fld"><label>제품 <span style="color:var(--faint)">(제품마다 5축 자동 포함)</span></label><div id="ed_products"></div><button class="addbtn" id="addProduct">+ 제품</button></div>`;
+  h+=`<div class="fld"><label>추가 문항 (가격·선호투표·자유의견·추천)</label><div id="ed_extras"></div><button class="addbtn" id="addExtra">+ 문항</button></div>`;
+  h+=`<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="abtn primary" id="edSaveAct">저장 &amp; 응답 폼에 활성화</button><button class="abtn" id="edSave">저장만</button></div></div>`;
+  el.innerHTML=h;
+  $("ed_slug").oninput=e=>ed.slug=e.target.value.trim();
+  $("ed_title").oninput=e=>ed.title=e.target.value;
+  $("ed_intro").oninput=e=>ed.intro=e.target.value;
+  renderBrandRows();renderProductRows();renderExtraRows();
+  $("addBrand").onclick=()=>{ed.brands.push({name:"새 브랜드",color:"#3a6ea5"});renderBrandRows();renderProductRows();};
+  $("addProduct").onclick=()=>{ed.products.push({brand:(ed.brands[0]&&ed.brands[0].name)||"",name:"새 제품",tag:""});renderProductRows();};
+  $("addExtra").onclick=()=>{ed.extras.push({type:"price",q:"q"+Math.random().toString(36).slice(2,7),label:"새 문항",opts:"",input:"",ph:""});renderExtraRows();};
+  $("edCancel").onclick=()=>{draft=null;ed=null;renderAdmin();};
+  $("edSaveAct").onclick=()=>saveDraft(true);
+  $("edSave").onclick=()=>saveDraft(false);
+}
+function renderBrandRows(){
+  const el=$("ed_brands");
+  el.innerHTML=ed.brands.map((b,i)=>`<div class="erow" style="grid-template-columns:1fr 44px 38px"><input value="${esc(b.name)}" data-i="${i}" data-k="name" placeholder="브랜드명"><input type="color" class="acolor" value="${esc(b.color||'#c1553a')}" data-i="${i}" data-k="color"><button class="del" data-i="${i}">×</button></div>`).join("");
+  el.querySelectorAll("input").forEach(inp=>inp.oninput=e=>{ed.brands[+e.target.dataset.i][e.target.dataset.k]=e.target.value;});
+  el.querySelectorAll(".del").forEach(b=>b.onclick=()=>{ed.brands.splice(+b.dataset.i,1);renderBrandRows();renderProductRows();});
+}
+function renderProductRows(){
+  const el=$("ed_products");const bopts=ed.brands.map(b=>b.name);
+  el.innerHTML=ed.products.map((p,i)=>`<div class="erow" style="grid-template-columns:1fr 1.2fr 1fr 38px"><select data-i="${i}">${bopts.map(n=>`<option ${n===p.brand?'selected':''}>${esc(n)}</option>`).join("")}</select><input value="${esc(p.name)}" data-i="${i}" data-k="name" placeholder="제품명"><input value="${esc(p.tag)}" data-i="${i}" data-k="tag" placeholder="태그(예: 칼국수·기본)"><button class="del" data-i="${i}">×</button></div>`).join("");
+  el.querySelectorAll("input").forEach(inp=>inp.oninput=e=>{ed.products[+e.target.dataset.i][e.target.dataset.k]=e.target.value;});
+  el.querySelectorAll("select").forEach(s=>s.onchange=e=>{ed.products[+e.target.dataset.i].brand=e.target.value;});
+  el.querySelectorAll(".del").forEach(b=>b.onclick=()=>{ed.products.splice(+b.dataset.i,1);renderProductRows();});
+}
+function renderExtraRows(){
+  const el=$("ed_extras");const types=[["price","가격 선택"],["choice","선호 투표"],["text","자유 의견"],["module","추천(선택)"]];
+  el.innerHTML=ed.extras.map((x,i)=>{const needOpts=(x.type==="price"||x.type==="choice"||(x.type==="module"&&x.input!=="text"));
+    return `<div style="border:1px solid var(--line);border-radius:9px;padding:10px;margin-bottom:8px">
+     <div class="erow" style="grid-template-columns:1fr 1.6fr 38px"><select data-i="${i}" data-k="type">${types.map(t=>`<option value="${t[0]}" ${t[0]===x.type?'selected':''}>${t[1]}</option>`).join("")}</select><input value="${esc(x.label)}" data-i="${i}" data-k="label" placeholder="질문 문구"><button class="del" data-i="${i}">×</button></div>
+     ${needOpts?`<div style="margin-top:6px"><input style="width:100%;border:1px solid var(--line-strong);background:var(--field);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:13px;color:var(--ink)" value="${esc(x.opts)}" data-i="${i}" data-k="opts" placeholder="선택지 (콤마 구분: 10,000원, 11,000원)"></div>`:''}
+     ${x.type==="module"?`<label style="font-size:11.5px;color:var(--muted);display:block;margin-top:7px"><input type="checkbox" data-i="${i}" data-k="modtext" ${x.input==="text"?'checked':''}> 자유입력(직접 추천)으로 받기</label>`:''}</div>`;}).join("");
+  el.querySelectorAll("[data-k]").forEach(inp=>{const ev=(inp.tagName==="SELECT"||inp.type==="checkbox")?"onchange":"oninput";
+    inp[ev]=e=>{const i=+e.target.dataset.i,k=e.target.dataset.k;
+      if(k==="modtext"){ed.extras[i].input=e.target.checked?"text":"";renderExtraRows();}
+      else if(k==="type"){ed.extras[i].type=e.target.value;renderExtraRows();}
+      else ed.extras[i][k]=e.target.value;};});
+  el.querySelectorAll(".del").forEach(b=>b.onclick=()=>{ed.extras.splice(+b.dataset.i,1);renderExtraRows();});
+}
+async function saveDraft(activate){
+  if(!ed.slug){alert("회차 ID를 입력하세요");return;} if(!sb){alert("서버 연결이 필요합니다");return;}
+  const blocks=[];
+  ed.products.forEach(p=>{if(!p.name)return;blocks.push({type:"product",brand:p.brand,name:p.name,tag:p.tag,cat:(p.tag||"").split(/[·|]/)[0].trim()});});
+  ed.extras.forEach(x=>{const b={type:x.type,q:x.q||("q"+Math.random().toString(36).slice(2,7)),label:x.label};
+    if(x.type==="price"){b.opts=(x.opts||"").split(",").map(s=>s.trim()).filter(Boolean);}
+    else if(x.type==="choice"){b.opts=(x.opts||"").split(",").map(s=>s.trim()).filter(Boolean);b.row=true;}
+    else if(x.type==="text"){b.ph=x.ph||"";}
+    else if(x.type==="module"){b.tag="추천 · 선택";if(x.input==="text"){b.input="text";b.ph=x.ph||"";}else{b.opts=(x.opts||"").split(",").map(s=>s.trim()).filter(Boolean);}}
+    blocks.push(b);});
+  const cfg=JSON.parse(JSON.stringify(draft)); cfg.slug=ed.slug; cfg.meta=cfg.meta||{};
+  cfg.meta.title=ed.title; cfg.meta.intro=ed.intro; cfg.meta.brands=ed.brands.filter(b=>b.name).map(b=>({name:b.name,color:b.color})); cfg.blocks=blocks;
+  const up={slug:cfg.slug,title:cfg.meta.title||cfg.slug,config:cfg};
+  if(activate){ try{ await sb.from("svy_surveys").update({is_open:false}).neq("slug",cfg.slug); }catch(e){} up.is_open=true; }
+  else if(draftIsNew){ up.is_open=false; }
+  const {error}=await sb.from("svy_surveys").upsert(up);
+  if(error){alert("저장 실패: "+error.message);return;}
+  draft=null;ed=null; await loadSurveys(); renderAdmin();
+  if(activate) loadActiveSurvey();
+  alert(activate?"저장하고 응답 폼에 활성화했습니다.":"저장했습니다.");
 }
 </script>
 </body>
