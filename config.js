@@ -5,5 +5,5 @@ window.SURVEY_CONFIG = {
   SUPABASE_URL: "https://aosqvruvmhaumckwuidn.supabase.co",
   SUPABASE_ANON_KEY: "sb_publishable_snEBmk1dvtRdsd63a7ef2g_eqYdbmLk",
   // 결과 보기 탭 비밀번호 (사장·본부만 아는 값으로 바꾸세요)
-  RESULTS_KEY: "insaeng2026",
+  RESULTS_KEY: "dlstoddkrn1!",
 };

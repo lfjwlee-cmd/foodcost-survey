@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "설문 미리보기",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["serve.js"],
+      "port": 4500
+    }
+  ]
+}
