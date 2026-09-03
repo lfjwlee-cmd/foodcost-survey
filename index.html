@@ -158,6 +158,9 @@
   .imgc:hover{border-color:var(--accent)}
   .imgc.on{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 30%,transparent)}
   .imgc.on span{color:var(--accent);font-weight:700}
+  .prev-wrap{max-height:440px;overflow:auto;border:1px solid var(--line-strong);border-radius:12px;background:var(--bg);padding:0}
+  .prev-body{max-width:420px;margin:0 auto;background:var(--surface);pointer-events:none;box-shadow:0 0 0 1px var(--line)}
+  .prev-body .rubric{margin:16px 14px 0}.prev-body section.q{padding:16px 16px}
   .hidden{display:none!important}
   @media(max-width:820px){.kpis{grid-template-columns:repeat(2,1fr)}.g2{grid-template-columns:1fr}.dash-head h1{font-size:19px}}
   @media(prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -284,26 +287,27 @@ $("themeBtn").onclick=()=>{const c=document.documentElement.getAttribute("data-t
 
 /* ===== FORM ===== */
 const answers={scores:{},extras:{},gender:null,age:null};
-function renderForm(){
-  const m=CFG.meta;
-  let h=`<div class="hero"><div class="brands">${m.brands.map(b=>`<span class="bpill" style="background:${b.color}">${esc(b.name)}</span>`).join("")}</div>
-    <h1>${esc(m.title)}</h1><p>${esc(m.intro)}</p><div class="meta-line">⏱ ${esc(m.metaLine)}</div></div>`;
-  h+=`<details class="rubric"><summary>📖 점수 기준 보기 <span style="color:var(--faint);font-weight:400">(초반 참고용)</span></summary><div class="rb-body">${CFG.rubric.map(r=>`<div class="rb-row"><span class="rb-n ${r.cls}">${esc(r.n)}</span><span>${esc(r.text)}</span></div>`).join("")}<p class="rb-note">※ 다섯 축 모두 같은 기준입니다.</p></div></details>`;
+function buildFormHtml(cfg,opt){
+  opt=opt||{};const m=cfg.meta||{};const AX=cfg.axes||[];const SEG=cfg.segments||{gender:[],age:[]};
+  const bcol=n=>{const b=(m.brands||[]).find(x=>x.name===n);return b?b.color:"var(--accent)";};
+  let h=`<div class="hero"><div class="brands">${(m.brands||[]).map(b=>`<span class="bpill" style="background:${esc(b.color)}">${esc(b.name)}</span>`).join("")}</div>
+    <h1>${esc(m.title||'')}</h1><p>${esc(m.intro||'')}</p><div class="meta-line">⏱ ${esc(m.metaLine||'')}</div></div>`;
+  if(cfg.rubric&&cfg.rubric.length) h+=`<details class="rubric"><summary>📖 점수 기준 보기 <span style="color:var(--faint);font-weight:400">(초반 참고용)</span></summary><div class="rb-body">${cfg.rubric.map(r=>`<div class="rb-row"><span class="rb-n ${r.cls||''}">${esc(r.n)}</span><span>${esc(r.text)}</span></div>`).join("")}<p class="rb-note">※ 다섯 축 모두 같은 기준입니다.</p></div></details>`;
   h+=`<form id="form"><section class="q"><div class="q-num">Q1 · 응답자 정보</div>
-    <div class="qlabel">성별 <span class="req">*</span></div><div class="choices row" data-seg="gender">${CFG.segments.gender.map(v=>`<button type="button" class="cbtn" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div>
-    <div class="qlabel" style="margin-top:16px">연령대 <span class="req">*</span></div><div class="choices row" data-seg="age">${CFG.segments.age.map(v=>`<button type="button" class="cbtn" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div></section>`;
+    <div class="qlabel">성별 <span class="req">*</span></div><div class="choices row" data-seg="gender">${(SEG.gender||[]).map(v=>`<button type="button" class="cbtn" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div>
+    <div class="qlabel" style="margin-top:16px">연령대 <span class="req">*</span></div><div class="choices row" data-seg="age">${(SEG.age||[]).map(v=>`<button type="button" class="cbtn" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div></section>`;
   let n=2;
-  CFG.blocks.forEach(b=>{
+  (cfg.blocks||[]).forEach(b=>{
     if(b.type==="product"){
-      h+=`<section class="q"><div class="q-num">Q${n}</div><div class="prod-head"><span class="bdot" style="background:${brandColor(b.brand)}"></span><h2>${esc(b.name)}</h2></div>
+      h+=`<section class="q"><div class="q-num">Q${n}</div><div class="prod-head"><span class="bdot" style="background:${bcol(b.brand)}"></span><h2>${esc(b.name)}</h2></div>
         <div class="prod-head" style="margin:-2px 0 14px 18px"><span class="bname">${esc(b.brand)} · ${esc(b.tag||"")}</span></div>`;
-      AXES.forEach(a=>{h+=`<div class="axis"><div class="axis-name"><span>${esc(a.label)} <span class="req">*</span></span><span class="hint">${esc(a.hint||"")}</span></div>
+      AX.forEach(a=>{h+=`<div class="axis"><div class="axis-name"><span>${esc(a.label)} <span class="req">*</span></span><span class="hint">${esc(a.hint||"")}</span></div>
         <div class="scale" data-prod="${esc(b.name)}" data-axis="${a.key}">${[5,4,3,2,1].map(x=>`<button type="button" class="sbtn" data-v="${x}">${x}</button>`).join("")}</div>
         <div class="scale-ends"><span>매우 좋음</span><span>매우 아쉬움</span></div></div>`;});
       h+=`</section>`;
     }else if(b.type==="price"||b.type==="choice"){
       h+=`<section class="q"><div class="q-num">Q${n}</div><div class="qlabel">${esc(b.label)} <span class="req">*</span></div>
-        <div class="choices ${b.row?'row':''}" data-extra="${b.q}">${b.opts.map(o=>`<button type="button" class="cbtn" data-v="${esc(o)}"><span class="rd"></span>${esc(o)}</button>`).join("")}</div></section>`;
+        <div class="choices ${b.row?'row':''}" data-extra="${b.q}">${(b.opts||[]).map(o=>`<button type="button" class="cbtn" data-v="${esc(o)}"><span class="rd"></span>${esc(o)}</button>`).join("")}</div></section>`;
     }else if(b.type==="imgchoice"){
       h+=`<section class="q"><div class="q-num">Q${n}</div><div class="qlabel">${esc(b.label)} <span class="req">*</span></div>
         <div class="imgchoices" data-extra="${b.q}">${(b.opts||[]).map(o=>`<button type="button" class="imgc" data-v="${esc(o.label)}">${o.image?`<img src="${esc(o.image)}" alt="">`:'<div class="noimg">사진 없음</div>'}<span>${esc(o.label)}</span></button>`).join("")}</div></section>`;
@@ -311,15 +315,15 @@ function renderForm(){
       h+=`<section class="q"><div class="q-num">Q${n}</div><div class="qlabel">${esc(b.label)}</div><textarea data-extra="${b.q}" placeholder="${esc(b.ph||"")}"></textarea></section>`;
     }else if(b.type==="module"){
       h+=`<section class="q"><div class="q-num">Q${n}</div><div class="optional-mod"><span class="modtag">◎ 선택 · ${esc(b.tag||"")}</span><div class="qlabel" style="margin:8px 0 12px">${esc(b.label)}</div>`;
-      h+= b.opts?`<div class="choices row" data-extra="${b.q}">${b.opts.map(o=>`<button type="button" class="cbtn" data-v="${esc(o)}">${esc(o)}</button>`).join("")}</div>`:`<textarea data-extra="${b.q}" placeholder="${esc(b.ph||"")}"></textarea>`;
+      h+= (b.opts&&b.opts.length)?`<div class="choices row" data-extra="${b.q}">${b.opts.map(o=>`<button type="button" class="cbtn" data-v="${esc(o)}">${esc(o)}</button>`).join("")}</div>`:`<textarea data-extra="${b.q}" placeholder="${esc(b.ph||"")}"></textarea>`;
       h+=`</div></section>`;
     }
     n++;
   });
-  h+=`<div class="submit-wrap"><button type="submit" class="submit" id="submitBtn">평가 제출하기</button><p class="err" id="err"></p>
-    <p class="foot-note">인생푸드 · 응답은 자동으로 누적됩니다</p></div></form>`;
-  $("app").innerHTML=h; wireForm();
+  if(!opt.preview) h+=`<div class="submit-wrap"><button type="submit" class="submit" id="submitBtn">평가 제출하기</button><p class="err" id="err"></p><p class="foot-note">인생푸드 · 응답은 자동으로 누적됩니다</p></div>`;
+  h+=`</form>`; return h;
 }
+function renderForm(){ $("app").innerHTML=buildFormHtml(CFG,{}); wireForm(); }
 function wireForm(){
   document.querySelectorAll(".scale").forEach(sc=>sc.querySelectorAll(".sbtn").forEach(btn=>btn.onclick=()=>{
     sc.querySelectorAll(".sbtn").forEach(x=>x.classList.remove("on"));btn.classList.add("on");
@@ -606,14 +610,15 @@ function buildEditModel(){
   const extras=draft.blocks.filter(b=>b.type!=="product").map(b=>{
     const o={type:b.type,q:b.q,label:b.label||"",opts:"",input:b.input||"",ph:b.ph||"",imgopts:[]};
     if(b.type==="imgchoice") o.imgopts=(b.opts||[]).map(x=>({label:x.label||"",image:x.image||""}));
-    else o.opts=(b.opts||[]).join(", ");
+    else o.opts=(b.opts||[]).join("\n");
     return o;
   });
   ed={slug:draft.slug,title:(draft.meta&&draft.meta.title)||"",intro:(draft.meta&&draft.meta.intro)||"",brands:((draft.meta&&draft.meta.brands)||[]).map(b=>({name:b.name,color:b.color||"#c1553a"})),products,extras};
 }
 function renderEditor(){
   const el=$("editorArea");
-  let h=`<div class="acard"><h3>${draftIsNew?'새 시식 만들기':'회차 편집'} <button class="abtn ghost" id="edCancel" style="float:right">닫기</button></h3>`;
+  let h=`<div class="acard"><h3>👁 미리보기 <span style="font-weight:400;color:var(--faint);font-size:11px">— 응답자에게 보이는 화면 (편집하면 실시간 반영)</span></h3><div class="prev-wrap"><div id="previewBody" class="prev-body"></div></div></div>`;
+  h+=`<div class="acard"><h3>${draftIsNew?'새 시식 만들기':'회차 편집'} <button class="abtn ghost" id="edCancel" style="float:right">닫기</button></h3>`;
   h+=`<div class="fld"><label>회차 ID</label><input id="ed_slug" value="${esc(ed.slug)}" ${draftIsNew?'':'readonly style="opacity:.6"'}></div>`;
   h+=`<div class="fld"><label>제목</label><input id="ed_title" value="${esc(ed.title)}"></div>`;
   h+=`<div class="fld"><label>소개 문구</label><textarea id="ed_intro" rows="2">${esc(ed.intro)}</textarea></div>`;
@@ -631,7 +636,13 @@ function renderEditor(){
   $("edCancel").onclick=()=>{draft=null;ed=null;renderAdmin();};
   $("edSaveAct").onclick=()=>saveDraft(true);
   $("edSave").onclick=()=>saveDraft(false);
+  updatePreview();
+  el.addEventListener("input",schedulePreview);
+  el.addEventListener("change",schedulePreview);
 }
+let _prevT=null;
+function schedulePreview(){ clearTimeout(_prevT); _prevT=setTimeout(updatePreview,180); }
+function updatePreview(){ if(!ed)return; const pb=$("previewBody"); if(!pb)return; try{ pb.innerHTML=buildFormHtml(buildDraftCfg(),{preview:true}); }catch(e){ pb.innerHTML='<div class="empty" style="padding:20px">미리보기 오류</div>'; } }
 function renderBrandRows(){
   const el=$("ed_brands");
   el.innerHTML=ed.brands.map((b,i)=>`<div class="erow" style="grid-template-columns:1fr 44px 38px"><input value="${esc(b.name)}" data-i="${i}" data-k="name" placeholder="브랜드명"><input type="color" class="acolor" value="${esc(b.color||'#c1553a')}" data-i="${i}" data-k="color"><button class="del" data-i="${i}">×</button></div>`).join("");
@@ -650,7 +661,7 @@ function renderExtraRows(){
   el.innerHTML=ed.extras.map((x,i)=>{const needOpts=(x.type==="price"||x.type==="choice"||(x.type==="module"&&x.input!=="text"));
     let bl=`<div class="erow" style="grid-template-columns:1fr 1.6fr 38px"><select data-i="${i}" data-k="type">${types.map(t=>`<option value="${t[0]}" ${t[0]===x.type?'selected':''}>${t[1]}</option>`).join("")}</select><input value="${esc(x.label)}" data-i="${i}" data-k="label" placeholder="질문 문구"><button class="del" data-i="${i}">×</button></div>`;
     if(x.type==="imgchoice") bl+=`<div style="margin-top:8px" id="imgopts_${i}"></div><button type="button" class="addbtn" data-addimg="${i}">+ 사진 항목</button>`;
-    else if(needOpts) bl+=`<div style="margin-top:6px"><input style="width:100%;border:1px solid var(--line-strong);background:var(--field);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:13px;color:var(--ink)" value="${esc(x.opts)}" data-i="${i}" data-k="opts" placeholder="선택지 (콤마 구분: 10,000원, 11,000원)"></div>`;
+    else if(needOpts) bl+=`<div style="margin-top:6px"><textarea rows="3" style="width:100%;border:1px solid var(--line-strong);background:var(--field);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:13px;color:var(--ink);resize:vertical" data-i="${i}" data-k="opts" placeholder="선택지 — 한 줄에 하나씩:&#10;10,000원&#10;11,000원&#10;12,000원">${esc(x.opts)}</textarea></div>`;
     if(x.type==="module") bl+=`<label style="font-size:11.5px;color:var(--muted);display:block;margin-top:7px"><input type="checkbox" data-i="${i}" data-k="modtext" ${x.input==="text"?'checked':''}> 자유입력(직접 추천)으로 받기</label>`;
     return `<div style="border:1px solid var(--line);border-radius:9px;padding:10px;margin-bottom:8px">${bl}</div>`;}).join("");
   el.querySelectorAll("[data-k]").forEach(inp=>{if(inp.dataset.k==="imglabel")return;const ev=(inp.tagName==="SELECT"||inp.type==="checkbox")?"onchange":"oninput";
@@ -689,22 +700,25 @@ async function uploadPhoto(file){
     return sb.storage.from("svy-photos").getPublicUrl(path).data.publicUrl;
   }catch(e){alert("사진 업로드 오류: "+(e.message||e));return null;}
 }
-async function saveDraft(activate){
-  if(!ed.slug){alert("회차 ID를 입력하세요");return;} if(!sb){alert("서버 연결이 필요합니다");return;}
+function buildDraftCfg(){
   const blocks=[];
   ed.products.forEach(p=>{if(!p.name)return;blocks.push({type:"product",brand:p.brand,name:p.name,tag:p.tag,cat:(p.tag||"").split(/[·|]/)[0].trim()});});
   ed.extras.forEach(x=>{const b={type:x.type,q:x.q||("q"+Math.random().toString(36).slice(2,7)),label:x.label};
-    if(x.type==="price"){b.opts=(x.opts||"").split(",").map(s=>s.trim()).filter(Boolean);}
-    else if(x.type==="choice"){b.opts=(x.opts||"").split(",").map(s=>s.trim()).filter(Boolean);b.row=true;}
+    if(x.type==="price"){b.opts=(x.opts||"").split("\n").map(s=>s.trim()).filter(Boolean);}
+    else if(x.type==="choice"){b.opts=(x.opts||"").split("\n").map(s=>s.trim()).filter(Boolean);b.row=true;}
     else if(x.type==="imgchoice"){b.opts=(x.imgopts||[]).filter(o=>o.label).map(o=>({label:o.label,image:o.image||""}));}
     else if(x.type==="text"){b.ph=x.ph||"";}
-    else if(x.type==="module"){b.tag="추천 · 선택";if(x.input==="text"){b.input="text";b.ph=x.ph||"";}else{b.opts=(x.opts||"").split(",").map(s=>s.trim()).filter(Boolean);}}
+    else if(x.type==="module"){b.tag="추천 · 선택";if(x.input==="text"){b.input="text";b.ph=x.ph||"";}else{b.opts=(x.opts||"").split("\n").map(s=>s.trim()).filter(Boolean);}}
     blocks.push(b);});
   const cfg=JSON.parse(JSON.stringify(draft)); cfg.slug=ed.slug; cfg.meta=cfg.meta||{};
   cfg.meta.title=ed.title; cfg.meta.intro=ed.intro;
   const usedBrands=[...new Set(blocks.filter(b=>b.type==="product").map(b=>b.brand))].filter(Boolean);
   cfg.meta.brands=usedBrands.map(n=>({name:n,color:regColor(n)}));
-  cfg.blocks=blocks;
+  cfg.blocks=blocks; return cfg;
+}
+async function saveDraft(activate){
+  if(!ed.slug){alert("회차 ID를 입력하세요");return;} if(!sb){alert("서버 연결이 필요합니다");return;}
+  const cfg=buildDraftCfg();
   const up={slug:cfg.slug,title:cfg.meta.title||cfg.slug,config:cfg};
   if(activate){ try{ await sb.from("svy_surveys").update({is_open:false}).neq("slug",cfg.slug); }catch(e){} up.is_open=true; }
   else if(draftIsNew){ up.is_open=false; }
