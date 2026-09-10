@@ -232,7 +232,7 @@
 "use strict";
 let CFG=null,AXES=[],sb=null;
 const CONF=window.SURVEY_CONFIG||{};
-try{ if(CONF.SUPABASE_URL&&!CONF.SUPABASE_URL.includes("여기에")) sb=window.supabase.createClient(CONF.SUPABASE_URL,CONF.SUPABASE_ANON_KEY); }catch(e){}
+try{ if(CONF.SUPABASE_URL&&!CONF.SUPABASE_URL.includes("여기에")) sb=window.supabase.createClient(CONF.SUPABASE_URL,CONF.SUPABASE_ANON_KEY,{global:{fetch:(u,o)=>fetch(u,Object.assign({},o,{cache:"no-store"}))}}); }catch(e){}
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 const brandColor=n=>{const b=(CFG.meta.brands||[]).find(x=>x.name===n);return b?b.color:"var(--accent)";};
