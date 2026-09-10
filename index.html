@@ -232,7 +232,15 @@
 "use strict";
 let CFG=null,AXES=[],sb=null;
 const CONF=window.SURVEY_CONFIG||{};
-try{ if(CONF.SUPABASE_URL&&!CONF.SUPABASE_URL.includes("여기에")) sb=window.supabase.createClient(CONF.SUPABASE_URL,CONF.SUPABASE_ANON_KEY,{global:{fetch:(u,o)=>fetch(u,Object.assign({},o,{cache:"no-store"}))}}); }catch(e){}
+function nocacheFetch(u,o){
+  var url=u, m=(o&&o.method)||"GET";
+  if(typeof u==="string" && m==="GET" && u.indexOf("/rest/v1/")>-1){
+    var cb="created_at=lt."+new Date(Date.now()+31536000000).toISOString(); // 항상참·매번 다름 → 중간 캐시 무효화
+    url=u+(u.indexOf("?")>-1?"&":"?")+cb;
+  }
+  return fetch(url,Object.assign({},o||{},{cache:"no-store"}));
+}
+try{ if(CONF.SUPABASE_URL&&!CONF.SUPABASE_URL.includes("여기에")) sb=window.supabase.createClient(CONF.SUPABASE_URL,CONF.SUPABASE_ANON_KEY,{global:{fetch:nocacheFetch}}); }catch(e){}
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 const brandColor=n=>{const b=(CFG.meta.brands||[]).find(x=>x.name===n);return b?b.color:"var(--accent)";};

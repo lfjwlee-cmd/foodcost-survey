@@ -17,7 +17,8 @@
   let h="브라우저: <code style='font-size:12px'>"+navigator.userAgent.slice(0,90)+"</code><br><br>";
   try{
     if(!window.supabase){ out.innerHTML=h+"<b style='color:red'>supabase 라이브러리 로드 실패 (CDN 차단?)</b>"; return; }
-    const sb=window.supabase.createClient(URL_,KEY_,{global:{fetch:(u,x)=>fetch(u,Object.assign({},x||{},{cache:"no-store"}))}});
+    const nf=(u,x)=>{let url=u;if(typeof u==="string"&&((x&&x.method)||"GET")==="GET"&&u.indexOf("/rest/v1/")>-1){url=u+(u.indexOf("?")>-1?"&":"?")+"created_at=lt."+new Date(Date.now()+31536000000).toISOString();}return fetch(url,Object.assign({},x||{},{cache:"no-store"}));};
+    const sb=window.supabase.createClient(URL_,KEY_,{global:{fetch:nf}});
     const t0=Date.now();
     const {data,error}=await sb.from("svy_responses").select("survey_slug,created_at").order("created_at",{ascending:false});
     if(error){ out.innerHTML=h+"<b style='color:#c0433a'>❌ 오류: "+error.message+"</b><br><small>"+(error.details||"")+"</small>"; return; }
