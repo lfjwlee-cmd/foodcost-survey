@@ -478,12 +478,20 @@ function renderInsight(ev){
   let msg="";if(bp)msg+=`관능 종합 1위는 <b>${esc(bp.name)}</b>(${esc(bp.brand)}, ${f1(bp.m)}/5). `;if(best)msg+=`'맛'이 가장 높은 연령대는 <b>${esc(best.age)}</b>(${f1(best.t)}/5).`;
   el.innerHTML="💡 "+msg;
 }
-function signal(m){if(m>=4)return `<span class="signal sig-go">🟢 출시권장</span>`;if(m>=3.3)return `<span class="signal sig-hold">🟡 보완</span>`;return `<span class="signal sig-no">🔴 재검토</span>`;}
+/* 표본 수(n) 기반 판정 가드 — 소수 인원 시식으로 '출시권장'이 나오는 걸 막는다.
+   n<MIN_JUDGE: 판정 보류 / m이 높아도 n<MIN_GO면 초록(출시권장) 대신 '유망(표본 더 필요)' */
+const MIN_JUDGE=3, MIN_GO=5;
+function signal(m,n){
+  if(!(n>=MIN_JUDGE)) return `<span class="signal" style="background:var(--surface-2);color:var(--muted);border:1px dashed var(--line-strong)">⚪ 표본부족 · 판정보류 (n&lt;${MIN_JUDGE})</span>`;
+  if(m>=4) return n>=MIN_GO ? `<span class="signal sig-go">🟢 출시권장</span>` : `<span class="signal sig-hold">🟡 유망 · 표본 더 필요 (n&lt;${MIN_GO})</span>`;
+  if(m>=3.3) return `<span class="signal sig-hold">🟡 보완</span>`;
+  return `<span class="signal sig-no">🔴 재검토</span>`;
+}
 function renderRank(ev){const t=$("rankTable");const names=[...new Set(ev.map(e=>e.name))];if(!names.length){t.innerHTML=`<tr><td class="empty">데이터 없음</td></tr>`;return;}
   const rows=names.map(nm=>{const pe=ev.filter(e=>e.name===nm);return{p:pe[0],m:avg(pe.map(x=>mean5(x.s))),taste:avg(pe.map(x=>x.s.taste||0)),n:pe.length};}).sort((a,b)=>b.m-a.m);
   t.innerHTML=`<thead><tr><th>제품</th><th>관능</th><th>맛</th><th>n</th><th>판정</th></tr></thead><tbody>`+rows.map(x=>`<tr>
     <td class="prod-cell"><b><span class="brand-dot" style="background:${brandColor(x.p.brand)}"></span>${esc(x.p.name)}</b><span>${esc(x.p.brand)} · ${esc(x.p.cat||"")}</span></td>
-    <td class="score-b">${f1(x.m)}</td><td class="score-b">${f1(x.taste)}</td><td class="num" style="color:var(--faint)">${x.n}</td><td>${signal(x.m)}</td></tr>`).join("")+`</tbody>`;}
+    <td class="score-b">${f1(x.m)}</td><td class="score-b">${f1(x.taste)}</td><td class="num" style="color:var(--faint)">${x.n}</td><td>${signal(x.m,x.n)}</td></tr>`).join("")+`</tbody>`;}
 function heatColor(v){const t=Math.max(0,Math.min(1,(v-2.5)/2));const hue=8+t*132;const alpha=0.16+0.5*Math.abs(v-3)/2;return `hsl(${hue} 62% 48% / ${alpha})`;}
 function renderHeat(ev){const el=$("heat");el.innerHTML="";const cols=AXES.length;
   const mk=inner=>{const d=document.createElement("div");d.className="heat-row";d.style.gridTemplateColumns=`70px repeat(${cols},1fr)`;d.innerHTML=inner;return d;};
@@ -535,7 +543,7 @@ function openReport(){
   const slug=viewSlug||CFG.slug||"설문";const evA=evAll();
   const names=[...new Set(evA.map(e=>e.name))];
   const rank=names.map(nm=>{const pe=evA.filter(e=>e.name===nm);return{name:pe[0].name,brand:pe[0].brand,m:avg(pe.map(x=>mean5(x.s))),axes:AXES.map(a=>avg(pe.map(x=>x.s[a.key]||0))),n:pe.length};}).sort((a,b)=>b.m-a.m);
-  const sigTxt=m=>m>=4?'🟢 출시권장':m>=3.3?'🟡 보완':'🔴 재검토';
+  const sigTxt=(m,n)=>!(n>=MIN_JUDGE)?`⚪ 표본부족·판정보류(n<${MIN_JUDGE})`:m>=4?(n>=MIN_GO?'🟢 출시권장':`🟡 유망·표본↑(n<${MIN_GO})`):m>=3.3?'🟡 보완':'🔴 재검토';
   const segCounts={};ROWS.forEach(r=>{const k=`${r.age||'-'} ${r.gender||'-'}`;segCounts[k]=(segCounts[k]||0)+1;});
   const tblocks=CFG.blocks.filter(b=>(b.type==="price"||b.type==="choice"||b.type==="imgchoice"||(b.type==="module"&&b.opts&&b.opts.length)));
   const texts=CFG.blocks.filter(b=>b.type==="text").map(b=>b.q);
@@ -556,7 +564,7 @@ function openReport(){
   <div class="kpis"><div class="kpi"><b>${ROWS.length}명</b><span>총 응답</span></div><div class="kpi"><b>${names.length}종</b><span>평가 제품</span></div><div class="kpi"><b>${rank.length?f1(avg(evA.map(e=>mean5(e.s)))):'-'}/5</b><span>관능 종합</span></div><div class="kpi"><b>${rank.length?esc(rank[0].name):'-'}</b><span>1위 제품</span></div></div>
   <h2>제품 랭킹 · 출시 판정</h2>
   <table><tr><th class="l">제품</th><th>브랜드</th>${AX.map(a=>`<th>${esc(a)}</th>`).join("")}<th>종합</th><th>n</th><th>판정</th></tr>
-  ${rank.map(x=>`<tr><td class="l">${esc(x.name)}</td><td>${esc(x.brand||'')}</td>${x.axes.map(v=>`<td>${f1(v)}</td>`).join("")}<td><b>${f1(x.m)}</b></td><td>${x.n}</td><td>${sigTxt(x.m)}</td></tr>`).join("")}</table>`;
+  ${rank.map(x=>`<tr><td class="l">${esc(x.name)}</td><td>${esc(x.brand||'')}</td>${x.axes.map(v=>`<td>${f1(v)}</td>`).join("")}<td><b>${f1(x.m)}</b></td><td>${x.n}</td><td>${sigTxt(x.m,x.n)}</td></tr>`).join("")}</table>`;
   if(tblocks.length){html+=`<h2>선택 · 투표 집계</h2>`;tblocks.forEach(b=>{const opts=(b.opts||[]).map(o=>b.type==="imgchoice"?o.label:o);const counts=opts.map(o=>ROWS.filter(r=>(r.extras||{})[b.q]===o).length);const tot=counts.reduce((a,c)=>a+c,0)||1;html+=`<div style="margin-bottom:8px"><b style="font-size:12.5px">${esc(b.label)}</b><table style="margin-top:3px"><tr>${opts.map(o=>`<th>${esc(o)}</th>`).join("")}</tr><tr>${counts.map(c=>`<td>${c}표 (${Math.round(c/tot*100)}%)</td>`).join("")}</tr></table></div>`;});}
   html+=`<h2>응답자 구성</h2><table><tr>${Object.keys(segCounts).map(k=>`<th>${esc(k)}</th>`).join("")}</tr><tr>${Object.values(segCounts).map(v=>`<td>${v}명</td>`).join("")}</tr></table>`;
   if(ops.length){html+=`<h2>종합 의견 (${ops.length}건)</h2>`+ops.slice(0,40).map(o=>`<div class="op">${esc(o.t)}<div class="m">${esc(o.meta)}</div></div>`).join("");}
