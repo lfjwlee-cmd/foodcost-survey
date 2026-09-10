@@ -233,7 +233,16 @@
 let CFG=null,AXES=[],sb=null;
 const CONF=window.SURVEY_CONFIG||{};
 function nocacheFetch(u,o){ return fetch(u,Object.assign({},o||{},{cache:"no-store"})); }
-try{ if(CONF.SUPABASE_URL&&!CONF.SUPABASE_URL.includes("여기에")) sb=window.supabase.createClient(CONF.SUPABASE_URL,CONF.SUPABASE_ANON_KEY,{global:{fetch:nocacheFetch}}); }catch(e){}
+// 이 설문 앱은 '익명(anon)'으로만 접속해야 함. 같은 Supabase 프로젝트를 쓰는 다른 앱(FoodCost 원가앱)에
+// 로그인한 브라우저에서는 supabase-js가 그 로그인 토큰(role=authenticated)을 대신 보내 RLS에 걸려 응답이
+// 0건으로 보이는 문제가 있었음 → 저장세션 상속을 끊고 Authorization을 anon키로 고정한다.
+try{
+  if(CONF.SUPABASE_URL&&!CONF.SUPABASE_URL.includes("여기에"))
+    sb=window.supabase.createClient(CONF.SUPABASE_URL,CONF.SUPABASE_ANON_KEY,{
+      auth:{persistSession:false, autoRefreshToken:false, detectSessionInUrl:false},
+      global:{ headers:{Authorization:"Bearer "+CONF.SUPABASE_ANON_KEY}, fetch:nocacheFetch }
+    });
+}catch(e){}
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 const brandColor=n=>{const b=(CFG.meta.brands||[]).find(x=>x.name===n);return b?b.color:"var(--accent)";};
