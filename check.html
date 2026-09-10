@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>설문 연결 점검</title></head>
+<body style="font-family:system-ui,'Malgun Gothic',sans-serif;padding:22px;font-size:17px;line-height:1.8;color:#1d1b18;max-width:640px;margin:0 auto">
+<h2>🔎 설문 연결 점검</h2>
+<div id="out">확인 중…</div>
+<hr style="margin:20px 0">
+<p style="color:#888;font-size:13px">이 페이지가 보여주는 숫자를 그대로 알려주세요. (응답이 실제로 DB에 몇 건 있는지 이 기기에서 직접 조회한 결과입니다.)</p>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(async()=>{
+  const out=document.getElementById("out");
+  const URL_="https://aosqvruvmhaumckwuidn.supabase.co";
+  const KEY_="sb_publishable_snEBmk1dvtRdsd63a7ef2g_eqYdbmLk";
+  let h="브라우저: <code style='font-size:12px'>"+navigator.userAgent.slice(0,90)+"</code><br><br>";
+  try{
+    if(!window.supabase){ out.innerHTML=h+"<b style='color:red'>supabase 라이브러리 로드 실패 (CDN 차단?)</b>"; return; }
+    const sb=window.supabase.createClient(URL_,KEY_,{global:{fetch:(u,x)=>fetch(u,Object.assign({},x||{},{cache:"no-store"}))}});
+    const t0=Date.now();
+    const {data,error}=await sb.from("svy_responses").select("survey_slug,created_at").order("created_at",{ascending:false});
+    if(error){ out.innerHTML=h+"<b style='color:#c0433a'>❌ 오류: "+error.message+"</b><br><small>"+(error.details||"")+"</small>"; return; }
+    const by={}; (data||[]).forEach(r=>by[r.survey_slug]=(by[r.survey_slug]||0)+1);
+    h+="<div style='font-size:44px;font-weight:800;color:#2f8f5b;margin:8px 0'>총 응답 "+(data||[]).length+"건</div>";
+    h+="회차별: <b>"+JSON.stringify(by)+"</b><br>";
+    h+="가장 최근 응답 시각: "+((data&&data[0])?new Date(data[0].created_at).toLocaleString('ko-KR'):'-')+"<br>";
+    h+="<span style='color:#888;font-size:13px'>조회 소요 "+(Date.now()-t0)+"ms · 현재시각 "+new Date().toLocaleTimeString('ko-KR')+"</span>";
+    out.innerHTML=h;
+  }catch(e){ out.innerHTML=h+"<b style='color:#c0433a'>❌ 실패: "+(e&&e.message||e)+"</b>"; }
+})();
+</script>
+</body></html>
