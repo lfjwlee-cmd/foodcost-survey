@@ -595,23 +595,49 @@ function renderAdmin(){
   body.innerHTML=h; $("btnNew").onclick=startNew; $("btnAddBrand").onclick=addBrand; renderSurveyList(); renderBrandList(); renderQR();
   if(draft&&ed) renderEditor();
 }
+let showArchived=false;
 function renderSurveyList(){
   const el=$("surveyList");
-  if(!SURVEYS.length){ el.innerHTML=`<div class="empty" style="padding:14px">저장된 회차가 없습니다. 새 시식을 만들어 보세요.</div>`; return; }
-  el.innerHTML=SURVEYS.map(s=>{const cnt=RESP_COUNTS[s.slug]||0;
-    return `<div class="srow"><div class="si"><b>${esc(s.title||s.slug)}</b>${s.is_open?'<span class="active-badge">응답 폼에 활성</span>':''}<span>${esc(s.slug)} · 응답 ${cnt}명 · ${(s.created_at||'').slice(0,10)}</span></div>
-      <div class="arow-actions"><button class="abtn" data-act="edit" data-slug="${esc(s.slug)}">편집</button>${s.is_open?'':`<button class="abtn" data-act="act" data-slug="${esc(s.slug)}">활성화</button>`}<button class="abtn" data-act="res" data-slug="${esc(s.slug)}">결과</button><button class="abtn" data-act="del" data-slug="${esc(s.slug)}" data-open="${s.is_open?1:0}" style="color:var(--bad)">삭제</button></div></div>`;}).join("");
+  const live=SURVEYS.filter(s=>!s.archived), arch=SURVEYS.filter(s=>s.archived);
+  if(!live.length && !arch.length){ el.innerHTML=`<div class="empty" style="padding:14px">저장된 회차가 없습니다. 새 시식을 만들어 보세요.</div>`; return; }
+  const row=(s,isArch)=>{const cnt=RESP_COUNTS[s.slug]||0;
+    const acts=isArch
+      ? `<button class="abtn" data-act="restore" data-slug="${esc(s.slug)}">복원</button><button class="abtn" data-act="res" data-slug="${esc(s.slug)}">결과</button>`
+      : `<button class="abtn" data-act="edit" data-slug="${esc(s.slug)}">편집</button>${s.is_open?'':`<button class="abtn" data-act="act" data-slug="${esc(s.slug)}">활성화</button>`}<button class="abtn" data-act="res" data-slug="${esc(s.slug)}">결과</button><button class="abtn" data-act="arch" data-slug="${esc(s.slug)}" data-open="${s.is_open?1:0}">숨기기</button>`;
+    return `<div class="srow"${isArch?' style="opacity:.55"':''}><div class="si"><b>${esc(s.title||s.slug)}</b>${s.is_open?'<span class="active-badge">응답 폼에 활성</span>':''}${isArch?'<span class="active-badge" style="background:var(--muted)">보관됨</span>':''}<span>${esc(s.slug)} · 응답 ${cnt}명 · ${(s.created_at||'').slice(0,10)}</span></div>
+      <div class="arow-actions">${acts}</div></div>`;};
+  let h=live.length?live.map(s=>row(s,false)).join(""):`<div class="empty" style="padding:14px">표시할 회차가 없습니다. 아래 보관함을 확인하거나 새 시식을 만드세요.</div>`;
+  if(arch.length){
+    h+=`<div style="margin:10px 0 4px"><button class="abtn" id="btnArch">🗂 보관한 회차 ${arch.length}개 ${showArchived?'접기':'보기'}</button></div>`;
+    if(showArchived) h+=arch.map(s=>row(s,true)).join("");
+  }
+  el.innerHTML=h;
+  const ba=$("btnArch"); if(ba) ba.onclick=()=>{showArchived=!showArchived;renderSurveyList();};
   el.querySelectorAll("[data-act]").forEach(b=>b.onclick=()=>{const slug=b.dataset.slug,act=b.dataset.act;
-    if(act==="edit")editSurvey(slug); else if(act==="act")activateSurvey(slug); else if(act==="res"){viewSlug=slug;setView("results");} else if(act==="del")deleteSurvey(slug,b.dataset.open==="1");});
+    if(act==="edit")editSurvey(slug);
+    else if(act==="act")activateSurvey(slug);
+    else if(act==="res"){viewSlug=slug;setView("results");}
+    else if(act==="arch")archiveSurvey(slug,b.dataset.open==="1",true);
+    else if(act==="restore")archiveSurvey(slug,false,false);});
 }
-async function deleteSurvey(slug,isOpen){
+// 회차는 삭제하지 않고 보관(archived)한다 — 익명 키로 영구 삭제가 불가능하도록 막혀 있고,
+// 보관은 언제든 복원 가능하다. 영구 삭제는 관리자 SQL Editor에서만.
+async function archiveSurvey(slug,isOpen,hide){
   if(!sb)return;
-  if(!confirm(`'${slug}' 회차를 삭제할까요?\n설문 정의만 삭제되고, 이미 받은 응답 기록은 결과 보기에 그대로 남습니다.`))return;
-  try{ await sb.from("svy_surveys").delete().eq("slug",slug); }catch(e){alert("삭제 실패: "+(e.message||e));return;}
+  if(hide && !confirm(`'${slug}' 회차를 보관함으로 옮길까요?\n삭제가 아닙니다. 받은 응답과 결과는 그대로 남고, 언제든 복원할 수 있습니다.`))return;
+  const patch=hide?{archived:true,is_open:false}:{archived:false};
+  const {error}=await sb.from("svy_surveys").update(patch).eq("slug",slug);
+  if(error){
+    const m=(error.message||"")+"";
+    if(/archived/i.test(m)) alert("DB에 archived 컬럼이 없습니다.\n보안-RLS-강화.sql 을 Supabase SQL Editor에서 먼저 실행하세요.");
+    else alert((hide?"보관":"복원")+" 실패: "+m);
+    return;
+  }
   await loadSurveys();
-  if(isOpen){ const next=SURVEYS[0]; if(next){ try{ await sb.from("svy_surveys").update({is_open:true}).eq("slug",next.slug); }catch(e){} } await loadSurveys(); await loadActiveSurvey(); }
+  if(hide&&isOpen){ const next=SURVEYS.find(x=>!x.archived); if(next){ try{ await sb.from("svy_surveys").update({is_open:true}).eq("slug",next.slug); }catch(e){} } await loadSurveys(); await loadActiveSurvey(); }
   renderAdmin();
 }
+
 function renderBrandList(){
   const el=$("brandList"); if(!el)return;
   if(!BRANDS_REG.length){ el.innerHTML=`<div class="empty" style="padding:12px">등록된 브랜드가 없습니다. 위 버튼으로 등록하세요.</div>`; return; }

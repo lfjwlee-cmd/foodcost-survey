@@ -10,6 +10,7 @@ create table if not exists public.svy_surveys (
   title       text not null default '신메뉴 시식 평가',
   config      jsonb not null default '{}'::jsonb,      -- questions.json 백업(선택)
   is_open     boolean not null default true,
+  archived    boolean not null default false,        -- 관리 목록에서 숨김(삭제 대신 보관)
   created_at  timestamptz not null default now()
 );
 
@@ -30,17 +31,27 @@ alter table public.svy_surveys   enable row level security;
 alter table public.svy_responses enable row level security;
 
 -- 4) 정책 (내부 도구 기준):
---    · 설문 정의: 자유 (편집기가 로그인 없이 저장)
---    · 응답: 넣기(응답 제출) + 읽기(대시보드 집계) 허용. 수정/삭제는 불가.
-drop policy if exists svy_surveys_all   on public.svy_surveys;
-drop policy if exists svy_resp_insert   on public.svy_responses;
-drop policy if exists svy_resp_read     on public.svy_responses;
+--    · 설문 정의: 읽기/추가/수정 허용(편집기가 로그인 없이 저장). **삭제는 불허** — 익명 키로
+--      회차가 영구 삭제되는 것을 막는다. 관리 탭의 숨기기는 archived 플래그(update)로 동작.
+--    · 응답: 넣기(제출) + 읽기(집계)만. 수정/삭제 불가(기록 보호).
+drop policy if exists svy_surveys_all    on public.svy_surveys;
+drop policy if exists svy_surveys_select on public.svy_surveys;
+drop policy if exists svy_surveys_insert on public.svy_surveys;
+drop policy if exists svy_surveys_update on public.svy_surveys;
+drop policy if exists svy_resp_insert    on public.svy_responses;
+drop policy if exists svy_resp_read      on public.svy_responses;
 
-create policy svy_surveys_all on public.svy_surveys
-  for all to anon using (true) with check (true);
+create policy svy_surveys_select on public.svy_surveys for select to public using (true);
+create policy svy_surveys_insert on public.svy_surveys for insert to public with check (true);
+create policy svy_surveys_update on public.svy_surveys for update to public using (true) with check (true);
+-- delete 정책은 의도적으로 만들지 않는다.
 
-create policy svy_resp_insert on public.svy_responses
-  for insert to anon with check (true);
+create policy svy_resp_insert on public.svy_responses for insert to public with check (true);
+create policy svy_resp_read   on public.svy_responses for select to public using (true);
 
-create policy svy_resp_read on public.svy_responses
-  for select to anon using (true);
+-- 5) 권한에서도 삭제 회수 (이중 방어). 상세·검증 쿼리는 보안-RLS-강화.sql 참고.
+revoke delete on public.svy_surveys   from anon, authenticated, public;
+revoke delete on public.svy_responses from anon, authenticated, public;
+revoke update on public.svy_responses from anon, authenticated, public;
+grant select, insert, update on public.svy_surveys   to anon;
+grant select, insert         on public.svy_responses to anon;
