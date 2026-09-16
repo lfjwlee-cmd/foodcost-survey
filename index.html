@@ -85,6 +85,7 @@
   .dash-head h1{font-size:22px;margin:0}.dash-head .sub{color:var(--muted);font-size:13px}
   .live{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--good);display:inline-flex;align-items:center;gap:5px}.live i{width:7px;height:7px;border-radius:50%;background:var(--good);animation:blink 2s infinite}@keyframes blink{50%{opacity:.3}}
   .dbtn{background:var(--surface);border:1px solid var(--line-strong);color:var(--ink);border-radius:9px;padding:7px 12px;font-family:inherit;font-size:13px;cursor:pointer}.dbtn:hover{border-color:var(--accent)}
+  .optm{font-size:10.5px;color:var(--faint);border:1px solid var(--line);border-radius:999px;padding:1px 7px;vertical-align:middle}
   .filters{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 15px;box-shadow:var(--shadow);margin-bottom:18px}
   .filter-row{display:flex;gap:20px;flex-wrap:wrap}.fgroup{display:flex;flex-direction:column;gap:6px}
   .flabel{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
@@ -302,15 +303,16 @@ $("themeBtn").onclick=()=>{const c=document.documentElement.getAttribute("data-t
 /* ===== FORM ===== */
 const answers={scores:{},extras:{},gender:null,age:null};
 function buildFormHtml(cfg,opt){
-  opt=opt||{};const m=cfg.meta||{};const AX=cfg.axes||[];const SEG=cfg.segments||{gender:[],age:[]};
+  opt=opt||{};const m=cfg.meta||{};const AX=cfg.axes||[];const ASK=askProfile(cfg);const HASP=hasProd(cfg);const SEG=cfg.segments||{gender:[],age:[]};
   const bcol=n=>{const b=(m.brands||[]).find(x=>x.name===n);return b?b.color:"var(--accent)";};
   let h=`<div class="hero"><div class="brands">${(m.brands||[]).map(b=>`<span class="bpill" style="background:${esc(b.color)}">${esc(b.name)}</span>`).join("")}</div>
     <h1>${esc(m.title||'')}</h1><p>${esc(m.intro||'')}</p><div class="meta-line"><span class="req">*</span> 표시는 꼭 응답해야 제출됩니다</div></div>`;
   if(m.showRubric!==false && cfg.rubric&&cfg.rubric.length) h+=`<details class="rubric"><summary>📖 점수 기준 보기</summary><div class="rb-body">${cfg.rubric.map(r=>`<div class="rb-row"><span class="rb-n ${r.cls||''}">${esc(r.n)}</span><span>${esc(r.text)}</span></div>`).join("")}<p class="rb-note">※ 다섯 축 모두 같은 기준입니다.</p></div></details>`;
-  h+=`<form id="form"><section class="q"><div class="q-num">Q1 · 응답자 정보</div>
+  h+=`<form id="form">`;
+  if(ASK) h+=`<section class="q"><div class="q-num">Q1 · 응답자 정보</div>
     <div class="qlabel">성별 <span class="req">*</span></div><div class="choices row" data-seg="gender">${(SEG.gender||[]).map(v=>`<button type="button" class="cbtn" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div>
     <div class="qlabel" style="margin-top:16px">연령대 <span class="req">*</span></div><div class="choices row" data-seg="age">${(SEG.age||[]).map(v=>`<button type="button" class="cbtn" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div></section>`;
-  let n=2;
+  let n=ASK?2:1;
   (cfg.blocks||[]).forEach(b=>{
     if(b.type==="product"){
       h+=`<section class="q"><div class="q-num">Q${n}</div><div class="prod-head"><span class="bdot" style="background:${bcol(b.brand)}"></span><h2>${esc(b.name)}</h2></div>
@@ -320,10 +322,10 @@ function buildFormHtml(cfg,opt){
         <div class="scale-ends"><span>매우 좋음</span><span>매우 아쉬움</span></div></div>`;});
       h+=`</section>`;
     }else if(b.type==="price"||b.type==="choice"){
-      h+=`<section class="q"><div class="q-num">Q${n}</div><div class="qlabel">${esc(b.label)} <span class="req">*</span></div>
+      h+=`<section class="q"><div class="q-num">Q${n}</div><div class="qlabel">${esc(b.label)} ${isReq(b)?`<span class="req">*</span>`:`<span class="optm">선택</span>`}</div>
         <div class="choices ${b.row?'row':''}" data-extra="${b.q}">${(b.opts||[]).map(o=>`<button type="button" class="cbtn" data-v="${esc(o)}"><span class="rd"></span>${esc(o)}</button>`).join("")}</div></section>`;
     }else if(b.type==="imgchoice"){
-      h+=`<section class="q"><div class="q-num">Q${n}</div><div class="qlabel">${esc(b.label)} <span class="req">*</span></div>
+      h+=`<section class="q"><div class="q-num">Q${n}</div><div class="qlabel">${esc(b.label)} ${isReq(b)?`<span class="req">*</span>`:`<span class="optm">선택</span>`}</div>
         <div class="imgchoices" data-extra="${b.q}">${(b.opts||[]).map(o=>`<button type="button" class="imgc" data-v="${esc(o.label)}">${o.image?`<img src="${esc(o.image)}" alt="">`:'<div class="noimg">사진 없음</div>'}<span>${esc(o.label)}</span></button>`).join("")}</div></section>`;
     }else if(b.type==="text"){
       h+=`<section class="q"><div class="q-num">Q${n}</div><div class="qlabel">${esc(b.label)}</div><textarea data-extra="${b.q}"></textarea></section>`;
@@ -334,7 +336,7 @@ function buildFormHtml(cfg,opt){
     }
     n++;
   });
-  if(!opt.preview) h+=`<div class="submit-wrap"><button type="submit" class="submit" id="submitBtn">평가 제출하기</button><p class="err" id="err"></p><p class="foot-note">인생푸드 · 응답은 자동으로 누적됩니다</p></div>`;
+  if(!opt.preview) h+=`<div class="submit-wrap"><button type="submit" class="submit" id="submitBtn">${HASP?"평가 제출하기":"제출하기"}</button><p class="err" id="err"></p><p class="foot-note">${ASK?"인생푸드 · 응답은 자동으로 누적됩니다":"인생푸드 · 응답은 익명으로 저장됩니다"}</p></div>`;
   h+=`</form>`; return h;
 }
 function renderForm(){ $("app").innerHTML=buildFormHtml(CFG,{}); wireForm(); }
@@ -353,16 +355,24 @@ function wireForm(){
   $("form").onsubmit=submit;
 }
 function isPick(b){return b.type==="price"||b.type==="choice"||b.type==="imgchoice";}
-function reqCount(){let c=2;CFG.blocks.forEach(b=>{if(b.type==="product")c+=AXES.length;if(isPick(b))c++;});return c;}
-function doneCount(){let c=0;if(answers.gender)c++;if(answers.age)c++;CFG.blocks.forEach(b=>{if(b.type==="product"){const s=answers.scores[b.name]||{};c+=AXES.filter(a=>s[a.key]).length;}if(isPick(b)&&answers.extras[b.q])c++;});return c;}
+/* 설문 유형 판정: 제품(관능) 블록이 하나라도 있으면 시식 설문, 없으면 일반 투표 설문 */
+function hasProd(cfg){return (((cfg||CFG)||{}).blocks||[]).some(b=>b.type==="product");}
+/* 응답자 정보(성별·연령) 수집 여부 — 기본 수집(기존 설문 호환) */
+function askProfile(cfg){return ((((cfg||CFG)||{}).meta)||{}).askProfile!==false;}
+/* 문항별 필수 여부 — 기본 필수(기존 설문 호환) */
+function isReq(b){return b.req!==false;}
+function reqCount(){let c=askProfile()?2:0;CFG.blocks.forEach(b=>{if(b.type==="product")c+=AXES.length;if(isPick(b)&&isReq(b))c++;});return Math.max(1,c);}
+function doneCount(){let c=0;if(askProfile()){if(answers.gender)c++;if(answers.age)c++;}CFG.blocks.forEach(b=>{if(b.type==="product"){const s=answers.scores[b.name]||{};c+=AXES.filter(a=>s[a.key]).length;}if(isPick(b)&&isReq(b)&&answers.extras[b.q])c++;});return c;}
 function prog(){$("pbar").style.width=Math.min(100,6+doneCount()/reqCount()*94)+"%";}
 function attrEsc(v){return String(v).replace(/["\\]/g,'\\$&');}
 function firstMissing(){
-  if(!answers.gender)return {msg:"성별을 선택해 주세요",sel:'[data-seg="gender"]'};
-  if(!answers.age)return {msg:"연령대를 선택해 주세요",sel:'[data-seg="age"]'};
+  if(askProfile()){
+    if(!answers.gender)return {msg:"성별을 선택해 주세요",sel:'[data-seg="gender"]'};
+    if(!answers.age)return {msg:"연령대를 선택해 주세요",sel:'[data-seg="age"]'};
+  }
   for(const b of CFG.blocks){
     if(b.type==="product"){const s=answers.scores[b.name]||{};for(const a of AXES)if(!s[a.key])return {msg:`'${b.name}'의 [${a.label}] 점수를 선택해 주세요`,sel:`.scale[data-prod="${attrEsc(b.name)}"][data-axis="${a.key}"]`};}
-    if(isPick(b)&&!answers.extras[b.q])return {msg:`'${b.label}'을(를) 선택해 주세요`,sel:`[data-extra="${attrEsc(b.q)}"]`};
+    if(isPick(b)&&isReq(b)&&!answers.extras[b.q])return {msg:`'${b.label}'을(를) 선택해 주세요`,sel:`[data-extra="${attrEsc(b.q)}"]`};
   } return null;
 }
 async function submit(e){
@@ -377,11 +387,12 @@ async function submit(e){
   }
   err.style.display="none";
   const items=CFG.blocks.filter(b=>b.type==="product").map(b=>({brand:b.brand,name:b.name,cat:b.cat||"",...answers.scores[b.name]}));
-  const payload={survey_slug:CFG.slug||"default",gender:answers.gender,age:answers.age,items,extras:answers.extras};
+  const ASKP=askProfile();
+  const payload={survey_slug:CFG.slug||"default",gender:ASKP?answers.gender:null,age:ASKP?answers.age:null,items,extras:answers.extras};
   if(!sb){err.textContent="⚠ 서버 연결이 설정되지 않았습니다.";err.style.display="block";return;}
   btn.disabled=true;btn.textContent="제출 중…";
   const {error}=await sb.from("svy_responses").insert(payload);
-  if(error){err.textContent="⚠ 저장 실패: "+error.message;err.style.display="block";btn.disabled=false;btn.textContent="평가 제출하기";return;}
+  if(error){err.textContent="⚠ 저장 실패: "+error.message;err.style.display="block";btn.disabled=false;btn.textContent=hasProd()?"평가 제출하기":"제출하기";return;}
   $("done").classList.add("show");window.scrollTo(0,0);
 }
 if($("again")) $("again").onclick=()=>{answers.scores={};answers.extras={};answers.gender=null;answers.age=null;$("done").classList.remove("show");renderForm();window.scrollTo(0,0);};
@@ -441,6 +452,13 @@ function evAll(){const ev=[];ROWS.forEach(r=>{(r.items||[]).forEach(it=>{ev.push
 function evF(){return evAll().filter(e=>(dstate.brand==="전체"||e.brand===dstate.brand)&&(dstate.age==="전체"||e.age===dstate.age)&&(dstate.gender==="전체"||e.gender===dstate.gender));}
 function rowsF(){return ROWS.filter(r=>(dstate.age==="전체"||r.age===dstate.age)&&(dstate.gender==="전체"||r.gender===dstate.gender));}
 function buildFilters(){
+  const showSeg=askProfile(), showBrand=hasProd();
+  document.querySelectorAll(".chips[data-filter]").forEach(box=>{const g=box.closest(".fgroup");if(!g)return;
+    const k=box.dataset.filter; g.style.display=((k==="brand"&&!showBrand)||((k==="age"||k==="gender")&&!showSeg))?"none":"";});
+  const fw=document.querySelector(".filters");
+  if(fw) fw.style.display=(!showSeg&&!showBrand)?"none":"";
+  if(!showSeg){dstate.age="전체";dstate.gender="전체";}
+  if(!showBrand){dstate.brand="전체";}
   const F={brand:["전체",...brandList()],age:["전체",...CFG.segments.age],gender:["전체",...CFG.segments.gender]};
   document.querySelectorAll(".chips[data-filter]").forEach(box=>{const key=box.dataset.filter;box.innerHTML="";
     F[key].forEach(v=>{const b=document.createElement("button");b.className="chip"+(dstate[key]===v?" on":"");b.textContent=v;
@@ -452,26 +470,67 @@ function renderDash(){
   $("dsub").textContent=`${viewSlug||CFG.slug} · 총 ${ROWS.length}명 응답`;
   if(!ROWS.length){$("dbody").innerHTML=`<div class="empty">아직 응답이 없습니다.<br>「📝 응답하기」에서 첫 응답을 넣거나 QR을 공유하세요.</div>`;return;}
   const ev=evF(),resp=rowsF();const names=[...new Set(evAll().map(e=>e.name))];
-  $("dbody").innerHTML=`<div class="kpis" id="kpis"></div><div class="insight" id="insight"></div>
-    <div class="grid g2 block"><div class="card"><h2>🚦 제품 랭킹 · 출시 판정</h2><p class="cap">관능 5축 평균 기준</p><div style="overflow-x:auto"><table id="rankTable"></table></div></div>
-    <div class="card"><h2>🔥 세그먼트 × 맛 히트맵</h2><p class="cap">연령대별 5축 평균</p><div class="heat" id="heat"></div></div></div>
-    <section class="card block"><h2 style="margin-bottom:12px">제품 상세</h2><div class="prod-picker" id="prodPicker"></div>
+  const HASP=hasProd();
+  let dh=`<div class="kpis" id="kpis"></div><div class="insight" id="insight"></div>`;
+  if(HASP){
+    dh+=`<div class="grid g2 block"><div class="card"><h2>🚦 제품 랭킹 · 출시 판정</h2><p class="cap">관능 5축 평균 기준</p><div style="overflow-x:auto"><table id="rankTable"></table></div></div>
+      <div class="card"><h2>🔥 세그먼트 × 맛 히트맵</h2><p class="cap">연령대별 5축 평균</p><div class="heat" id="heat"></div></div></div>
+      <section class="card block"><h2 style="margin-bottom:12px">제품 상세</h2><div class="prod-picker" id="prodPicker"></div>
       <div class="grid g2"><div><p class="cap" style="margin-bottom:2px">관능 프로필</p><div class="radar-wrap"><svg id="radar" width="300" height="240" viewBox="0 0 300 240"></svg></div><div class="radar-legend" id="radarLegend"></div></div>
       <div id="votes"></div></div></section>
-    <div class="grid g2 block"><div class="card"><h2>💬 종합 의견</h2><p class="cap">자유 서술</p><div id="opinions"></div></div>
+      <div class="grid g2 block"><div class="card"><h2>💬 종합 의견</h2><p class="cap">자유 서술</p><div id="opinions"></div></div>
       <div class="card"><h2>🗳️ 선택·투표 집계</h2><p class="cap">가격·선호·모듈</p><div id="tally"></div></div></div>`;
-  renderKpis(ev,resp);renderInsight(ev);renderRank(ev);renderHeat(ev);
-  if(dstate.product>=names.length)dstate.product=0;
-  renderPicker(names);renderDetail(names);renderOpinions(resp);renderTally(resp);
+  }else{
+    // 일반 투표 설문 — 관능(제품) 카드는 그리지 않는다
+    dh+=`<div class="card block"><h2>🗳️ 문항별 응답 집계</h2><p class="cap">선택지별 득표</p><div id="tally"></div></div>
+      <div class="card block"><h2>💬 자유 의견</h2><p class="cap">서술형 응답</p><div id="opinions"></div></div>`;
+  }
+  $("dbody").innerHTML=dh;
+  renderKpis(ev,resp);renderInsight(ev,resp);
+  if(HASP){
+    renderRank(ev);renderHeat(ev);
+    if(dstate.product>=names.length)dstate.product=0;
+    renderPicker(names);renderDetail(names);
+  }
+  renderOpinions(resp);renderTally(resp);
 }
 function renderKpis(ev,resp){
+  if(!hasProd()){ renderVoteKpis(resp); return; }
   const pids=new Set(ev.map(e=>e.name));const overall=avg(ev.map(e=>mean5(e.s)));
   let top=null;[...pids].forEach(nm=>{const pe=ev.filter(e=>e.name===nm);const m=avg(pe.map(x=>mean5(x.s)));if(!top||m>top.m)top={m,name:nm};});
   $("kpis").innerHTML=[["응답자 수",`${resp.length}<small> 명</small>`,"필터 후"],["대상 제품",`${pids.size}<small> 종</small>`,`${new Set(ev.map(e=>e.brand)).size}개 브랜드`],
     ["관능 종합",ev.length?`${f1(overall)}<small> /5</small>`:"—","5축 평균"],["최고 제품",top?`${f1(top.m)}<small> /5</small>`:"—",top?top.name:"—"]]
     .map(([l,v,n])=>`<div class="kpi"><div class="k-label">${l}</div><div class="k-val num">${v}</div><div class="k-note">${n}</div></div>`).join("");
 }
-function renderInsight(ev){
+function pickBlocks(){return CFG.blocks.filter(b=>(b.type==="price"||b.type==="choice"||b.type==="imgchoice"||(b.type==="module"&&b.opts&&b.opts.length)));}
+function tallyOf(b,resp){
+  const opts=(b.opts||[]).map(o=>b.type==="imgchoice"?o.label:o);
+  const counts=opts.map(o=>resp.filter(r=>(r.extras||{})[b.q]===o).length);
+  const mx=Math.max(0,...counts); const i=counts.indexOf(mx);
+  const answered=counts.reduce((a,c)=>a+c,0);
+  return {label:b.label,top:mx>0?opts[i]:null,topN:mx,answered,opts,counts};
+}
+function renderVoteKpis(resp){
+  const pbs=pickBlocks(); const first=pbs.length?tallyOf(pbs[0],resp):null;
+  const texts=CFG.blocks.filter(b=>b.type==="text").map(b=>b.q);
+  const opinions=resp.filter(r=>texts.some(q=>String((r.extras||{})[q]||"").trim())).length;
+  const share=first&&first.answered?Math.round(first.topN/first.answered*100):0;
+  $("kpis").innerHTML=[
+    ["응답자 수",`${resp.length}<small> 명</small>`,"총 제출"],
+    ["투표 문항",`${pbs.length}<small> 개</small>`,"선택형 기준"],
+    ["1순위",first&&first.top?esc(first.top):"—",first?esc(first.label):"선택 문항 없음"],
+    ["1순위 지지율",first&&first.top?`${share}<small> %</small>`:"—",first&&first.top?`${first.topN}/${first.answered}명`:"—"],
+    ["자유 의견",`${opinions}<small> 건</small>`,"서술형 응답"]
+  ].map(([l,v,n])=>`<div class="kpi"><div class="k-label">${l}</div><div class="k-val num">${v}</div><div class="k-note">${n}</div></div>`).join("");
+}
+function renderInsight(ev,resp){
+  if(!hasProd()){
+    const el=$("insight"); const pbs=pickBlocks();
+    if(!resp||!resp.length){el.innerHTML="아직 응답이 없습니다.";return;}
+    const parts=pbs.map(b=>tallyOf(b,resp)).filter(t=>t.top).map(t=>`<b>${esc(t.label)}</b> → ${esc(t.top)} (${t.topN}표)`);
+    el.innerHTML="💡 "+(parts.length?parts.join(" · "):"집계할 선택 문항이 없습니다.");
+    return;
+  }
   const el=$("insight");if(!ev.length){el.innerHTML="선택 조건에 응답이 없습니다.";return;}
   let bp=null;[...new Set(ev.map(e=>e.name))].forEach(nm=>{const pe=ev.filter(e=>e.name===nm);const m=avg(pe.map(x=>mean5(x.s)));if(!bp||m>bp.m)bp={m,name:nm,brand:pe[0].brand};});
   let best=null;CFG.segments.age.forEach(age=>{const sub=ev.filter(e=>e.age===age);if(sub.length){const t=avg(sub.map(e=>e.s.taste||0));if(!best||t>best.t)best={age,t};}});
@@ -548,7 +607,7 @@ function openReport(){
   const tblocks=CFG.blocks.filter(b=>(b.type==="price"||b.type==="choice"||b.type==="imgchoice"||(b.type==="module"&&b.opts&&b.opts.length)));
   const texts=CFG.blocks.filter(b=>b.type==="text").map(b=>b.q);
   const ops=[];ROWS.forEach(r=>texts.forEach(q=>{const v=(r.extras||{})[q];if(v&&(''+v).trim()&&v!=="."&&v!=="-")ops.push({t:v,meta:`${r.age||''} ${r.gender||''}`});}));
-  const AX=AXES.map(a=>a.label);
+  const AX=AXES.map(a=>a.label);const HASP=hasProd();const ASKP=askProfile();
   let html=`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${esc(CFG.meta.title||slug)} 결과 보고서</title>
   <style>*{box-sizing:border-box}body{font-family:'Malgun Gothic','맑은 고딕',system-ui,sans-serif;color:#1d1b18;margin:0;padding:30px 38px;font-size:13px;line-height:1.5}
   h1{font-size:21px;margin:0 0 2px}.sub{color:#6f6b64;font-size:12px;margin-bottom:16px}
@@ -559,14 +618,15 @@ function openReport(){
   .kpis{display:flex;gap:10px;margin-bottom:6px;flex-wrap:wrap}.kpi{border:1px solid #d4d0c8;border-radius:8px;padding:8px 14px;min-width:110px}.kpi b{font-size:19px;display:block}.kpi span{color:#6f6b64;font-size:11px}
   @media print{.toolbar{display:none}body{padding:6px 4px}}</style></head><body>
   <div class="toolbar"><button onclick="window.print()">🖨 인쇄 / PDF 저장</button></div>
-  <h1>${esc(CFG.meta.title||slug)} — 시식 평가 결과 보고서</h1>
+  <h1>${esc(CFG.meta.title||slug)} — ${HASP?"시식 평가":"투표"} 결과 보고서</h1>
   <div class="sub">회차: ${esc(slug)} · 응답자 ${ROWS.length}명 · 생성 ${esc(new Date().toLocaleString('ko-KR'))}</div>
-  <div class="kpis"><div class="kpi"><b>${ROWS.length}명</b><span>총 응답</span></div><div class="kpi"><b>${names.length}종</b><span>평가 제품</span></div><div class="kpi"><b>${rank.length?f1(avg(evA.map(e=>mean5(e.s)))):'-'}/5</b><span>관능 종합</span></div><div class="kpi"><b>${rank.length?esc(rank[0].name):'-'}</b><span>1위 제품</span></div></div>
-  <h2>제품 랭킹 · 출시 판정</h2>
+  <div class="kpis"><div class="kpi"><b>${ROWS.length}명</b><span>총 응답</span></div>${HASP?`<div class="kpi"><b>${names.length}종</b><span>평가 제품</span></div><div class="kpi"><b>${rank.length?f1(avg(evA.map(e=>mean5(e.s)))):"-"}/5</b><span>관능 종합</span></div><div class="kpi"><b>${rank.length?esc(rank[0].name):"-"}</b><span>1위 제품</span></div>`:`<div class="kpi"><b>${tblocks.length}개</b><span>투표 문항</span></div><div class="kpi"><b>${ops.length}건</b><span>자유 의견</span></div>`}</div>
+  `;
+  if(HASP){ html+=`<h2>제품 랭킹 · 출시 판정</h2>
   <table><tr><th class="l">제품</th><th>브랜드</th>${AX.map(a=>`<th>${esc(a)}</th>`).join("")}<th>종합</th><th>n</th><th>판정</th></tr>
-  ${rank.map(x=>`<tr><td class="l">${esc(x.name)}</td><td>${esc(x.brand||'')}</td>${x.axes.map(v=>`<td>${f1(v)}</td>`).join("")}<td><b>${f1(x.m)}</b></td><td>${x.n}</td><td>${sigTxt(x.m,x.n)}</td></tr>`).join("")}</table>`;
+  ${rank.map(x=>`<tr><td class="l">${esc(x.name)}</td><td>${esc(x.brand||"")}</td>${x.axes.map(v=>`<td>${f1(v)}</td>`).join("")}<td><b>${f1(x.m)}</b></td><td>${x.n}</td><td>${sigTxt(x.m,x.n)}</td></tr>`).join("")}</table>`; }
   if(tblocks.length){html+=`<h2>선택 · 투표 집계</h2>`;tblocks.forEach(b=>{const opts=(b.opts||[]).map(o=>b.type==="imgchoice"?o.label:o);const counts=opts.map(o=>ROWS.filter(r=>(r.extras||{})[b.q]===o).length);const tot=counts.reduce((a,c)=>a+c,0)||1;html+=`<div style="margin-bottom:8px"><b style="font-size:12.5px">${esc(b.label)}</b><table style="margin-top:3px"><tr>${opts.map(o=>`<th>${esc(o)}</th>`).join("")}</tr><tr>${counts.map(c=>`<td>${c}표 (${Math.round(c/tot*100)}%)</td>`).join("")}</tr></table></div>`;});}
-  html+=`<h2>응답자 구성</h2><table><tr>${Object.keys(segCounts).map(k=>`<th>${esc(k)}</th>`).join("")}</tr><tr>${Object.values(segCounts).map(v=>`<td>${v}명</td>`).join("")}</tr></table>`;
+  if(ASKP) html+=`<h2>응답자 구성</h2><table><tr>${Object.keys(segCounts).map(k=>`<th>${esc(k)}</th>`).join("")}</tr><tr>${Object.values(segCounts).map(v=>`<td>${v}명</td>`).join("")}</tr></table>`;
   if(ops.length){html+=`<h2>종합 의견 (${ops.length}건)</h2>`+ops.slice(0,40).map(o=>`<div class="op">${esc(o.t)}<div class="m">${esc(o.meta)}</div></div>`).join("");}
   html+=`</body></html>`;
   const w=window.open("","_blank");if(!w){alert("팝업이 차단되었습니다. 팝업을 허용해 주세요.");return;}
@@ -681,12 +741,12 @@ async function activateSurvey(slug){
 function buildEditModel(){
   const products=draft.blocks.filter(b=>b.type==="product").map(b=>({brand:b.brand,name:b.name,tag:b.tag||""}));
   const extras=draft.blocks.filter(b=>b.type!=="product").map(b=>{
-    const o={type:b.type,q:b.q,label:b.label||"",opts:"",input:b.input||"",ph:b.ph||"",imgopts:[]};
+    const o={type:b.type,q:b.q,label:b.label||"",opts:"",input:b.input||"",ph:b.ph||"",imgopts:[],req:b.req!==false};
     if(b.type==="imgchoice") o.imgopts=(b.opts||[]).map(x=>({label:x.label||"",image:x.image||""}));
     else o.opts=(b.opts||[]).join("\n");
     return o;
   });
-  ed={slug:draft.slug,title:(draft.meta&&draft.meta.title)||"",intro:(draft.meta&&draft.meta.intro)||"",showRubric:!(draft.meta&&draft.meta.showRubric===false),brands:((draft.meta&&draft.meta.brands)||[]).map(b=>({name:b.name,color:b.color||"#c1553a"})),products,extras};
+  ed={slug:draft.slug,title:(draft.meta&&draft.meta.title)||"",intro:(draft.meta&&draft.meta.intro)||"",showRubric:!(draft.meta&&draft.meta.showRubric===false),askProfile:!(draft.meta&&draft.meta.askProfile===false),brands:((draft.meta&&draft.meta.brands)||[]).map(b=>({name:b.name,color:b.color||"#c1553a"})),products,extras};
 }
 function renderEditor(){
   const el=$("editorArea");
@@ -696,18 +756,20 @@ function renderEditor(){
   h+=`<div class="fld"><label>제목</label><input id="ed_title" value="${esc(ed.title)}"></div>`;
   h+=`<div class="fld"><label>소개 문구</label><textarea id="ed_intro" rows="2">${esc(ed.intro)}</textarea></div>`;
   h+=`<div class="fld"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="ed_rubric" ${ed.showRubric?'checked':''} style="width:auto;margin:0"> 점수 기준 보기 표시 <span style="color:var(--faint);font-weight:400;font-size:11px">(껐다 켰다 가능 · 응답 폼 상단 안내)</span></label></div>`;
+  h+=`<div class="fld"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="ed_ask" ${ed.askProfile?"checked":""} style="width:auto;margin:0"> 응답자 정보(성별·연령) 받기 <span style="color:var(--faint);font-weight:400;font-size:11px">(끄면 완전 익명 — 사내 투표처럼 소수가 응답할 때 권장)</span></label></div>`;
   h+=`<p style="font-size:11.5px;color:var(--faint);margin:0 0 12px">브랜드는 위 <b>브랜드 관리</b>에서 등록하면 아래 제품의 브랜드 목록에 자동으로 나타납니다.</p>`;
-  h+=`<div class="fld"><label>제품 <span style="color:var(--faint)">(제품마다 5축 자동 포함)</span></label><div id="ed_products"></div><button class="addbtn" id="addProduct">+ 제품</button></div>`;
-  h+=`<div class="fld"><label>추가 문항 (가격·선호투표·자유의견·추천)</label><div id="ed_extras"></div><button class="addbtn" id="addExtra">+ 문항</button></div>`;
+  h+=`<div class="fld"><label>제품 <span style="color:var(--faint)">(제품마다 관능 5축 자동 포함 · <b>업무 투표 등 관능평가가 필요 없으면 비워 두세요</b>)</span></label><div id="ed_products"></div><button class="addbtn" id="addProduct">+ 제품</button></div>`;
+  h+=`<div class="fld"><label>문항 <span style="color:var(--faint)">(선택 투표 · 사진 투표 · 자유 의견)</span></label><div id="ed_extras"></div><button class="addbtn" id="addExtra">+ 문항</button></div>`;
   h+=`<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="abtn primary" id="edSaveAct">저장 &amp; 응답 폼에 활성화</button><button class="abtn" id="edSave">저장만</button></div></div>`;
   el.innerHTML=h;
   $("ed_slug").oninput=e=>ed.slug=e.target.value.trim();
   $("ed_title").oninput=e=>ed.title=e.target.value;
   $("ed_intro").oninput=e=>ed.intro=e.target.value;
   $("ed_rubric").onchange=e=>{ed.showRubric=e.target.checked;};
+  $("ed_ask").onchange=e=>{ed.askProfile=e.target.checked;};
   renderProductRows();renderExtraRows();
   $("addProduct").onclick=()=>{ed.products.push({brand:(BRANDS_REG[0]&&BRANDS_REG[0].name)||"",name:"새 제품",tag:""});renderProductRows();};
-  $("addExtra").onclick=()=>{ed.extras.push({type:"price",q:"q"+Math.random().toString(36).slice(2,7),label:"새 문항",opts:"",input:"",ph:""});renderExtraRows();};
+  $("addExtra").onclick=()=>{ed.extras.push({type:"choice",q:"q"+Math.random().toString(36).slice(2,7),label:"새 문항",opts:"",input:"",ph:""});renderExtraRows();};
   $("edCancel").onclick=()=>{draft=null;ed=null;renderAdmin();};
   $("edSaveAct").onclick=()=>saveDraft(true);
   $("edSave").onclick=()=>saveDraft(false);
@@ -732,17 +794,19 @@ function renderProductRows(){
   el.querySelectorAll(".del").forEach(b=>b.onclick=()=>{ed.products.splice(+b.dataset.i,1);renderProductRows();});
 }
 function renderExtraRows(){
-  const el=$("ed_extras");const types=[["price","가격 선택"],["choice","선호 투표"],["imgchoice","사진 투표"],["text","자유 의견"],["module","추천(선택)"]];
+  const el=$("ed_extras");const types=[["choice","선택 투표 (버튼형)"],["price","선택 투표 (목록형)"],["imgchoice","사진 투표"],["text","자유 의견"],["module","추가 의견 (항상 선택)"]];
   el.innerHTML=ed.extras.map((x,i)=>{const needOpts=(x.type==="price"||x.type==="choice"||(x.type==="module"&&x.input!=="text"));
     let bl=`<div class="erow" style="grid-template-columns:1fr 1.6fr 38px"><select data-i="${i}" data-k="type">${types.map(t=>`<option value="${t[0]}" ${t[0]===x.type?'selected':''}>${t[1]}</option>`).join("")}</select><input value="${esc(x.label)}" data-i="${i}" data-k="label" placeholder="질문 문구"><button class="del" data-i="${i}">×</button></div>`;
     if(x.type==="imgchoice") bl+=`<div style="margin-top:8px" id="imgopts_${i}"></div><button type="button" class="addbtn" data-addimg="${i}">+ 사진 항목</button>`;
     else if(needOpts) bl+=`<div style="margin-top:6px"><textarea rows="3" style="width:100%;border:1px solid var(--line-strong);background:var(--field);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:13px;color:var(--ink);resize:vertical" data-i="${i}" data-k="opts" placeholder="선택지 — 한 줄에 하나씩:&#10;10,000원&#10;11,000원&#10;12,000원">${esc(x.opts)}</textarea></div>`;
-    if(x.type==="module") bl+=`<label style="font-size:11.5px;color:var(--muted);display:block;margin-top:7px"><input type="checkbox" data-i="${i}" data-k="modtext" ${x.input==="text"?'checked':''}> 자유입력(직접 추천)으로 받기</label>`;
+    if(x.type==="module") bl+=`<label style="font-size:11.5px;color:var(--muted);display:block;margin-top:7px"><input type="checkbox" data-i="${i}" data-k="modtext" ${x.input==="text"?"checked":""}> 자유입력(직접 추천)으로 받기</label>`;
+    if(x.type==="price"||x.type==="choice"||x.type==="imgchoice") bl+=`<label style="font-size:11.5px;color:var(--muted);display:block;margin-top:7px"><input type="checkbox" data-i="${i}" data-k="req" ${x.req!==false?"checked":""}> 필수 응답 <span style="color:var(--faint)">(끄면 건너뛸 수 있음)</span></label>`;
     return `<div style="border:1px solid var(--line);border-radius:9px;padding:10px;margin-bottom:8px">${bl}</div>`;}).join("");
   el.querySelectorAll("[data-k]").forEach(inp=>{if(inp.dataset.k==="imglabel")return;const ev=(inp.tagName==="SELECT"||inp.type==="checkbox")?"onchange":"oninput";
     inp[ev]=e=>{const i=+e.target.dataset.i,k=e.target.dataset.k;
       if(k==="modtext"){ed.extras[i].input=e.target.checked?"text":"";renderExtraRows();}
       else if(k==="type"){ed.extras[i].type=e.target.value;if(e.target.value==="imgchoice"&&!ed.extras[i].imgopts)ed.extras[i].imgopts=[];renderExtraRows();}
+      else if(k==="req"){ed.extras[i].req=e.target.checked;}
       else ed.extras[i][k]=e.target.value;};});
   el.querySelectorAll("[data-addimg]").forEach(b=>b.onclick=()=>{const i=+b.dataset.addimg;(ed.extras[i].imgopts=ed.extras[i].imgopts||[]).push({label:"",image:""});renderImgOpts(i);});
   el.querySelectorAll(".del").forEach(b=>b.onclick=()=>{ed.extras.splice(+b.dataset.i,1);renderExtraRows();});
@@ -779,6 +843,7 @@ function buildDraftCfg(){
   const blocks=[];
   ed.products.forEach(p=>{if(!p.name)return;blocks.push({type:"product",brand:p.brand,name:p.name,tag:p.tag,cat:(p.tag||"").split(/[·|]/)[0].trim()});});
   ed.extras.forEach(x=>{const b={type:x.type,q:x.q||("q"+Math.random().toString(36).slice(2,7)),label:x.label};
+    if((x.type==="price"||x.type==="choice"||x.type==="imgchoice")&&x.req===false) b.req=false;
     if(x.type==="price"){b.opts=(x.opts||"").split("\n").map(s=>s.trim()).filter(Boolean);}
     else if(x.type==="choice"){b.opts=(x.opts||"").split("\n").map(s=>s.trim()).filter(Boolean);b.row=true;}
     else if(x.type==="imgchoice"){b.opts=(x.imgopts||[]).filter(o=>o.label).map(o=>({label:o.label,image:o.image||""}));}
@@ -786,7 +851,7 @@ function buildDraftCfg(){
     else if(x.type==="module"){b.tag="추천 · 선택";if(x.input==="text"){b.input="text";b.ph=x.ph||"";}else{b.opts=(x.opts||"").split("\n").map(s=>s.trim()).filter(Boolean);}}
     blocks.push(b);});
   const cfg=JSON.parse(JSON.stringify(draft)); cfg.slug=ed.slug; cfg.meta=cfg.meta||{};
-  cfg.meta.title=ed.title; cfg.meta.intro=ed.intro; cfg.meta.showRubric=ed.showRubric;
+  cfg.meta.title=ed.title; cfg.meta.intro=ed.intro; cfg.meta.showRubric=ed.showRubric; cfg.meta.askProfile=ed.askProfile!==false;
   const usedBrands=[...new Set(blocks.filter(b=>b.type==="product").map(b=>b.brand))].filter(Boolean);
   cfg.meta.brands=usedBrands.map(n=>({name:n,color:regColor(n)}));
   cfg.blocks=blocks; return cfg;
