@@ -85,6 +85,7 @@
   .dash-head h1{font-size:22px;margin:0}.dash-head .sub{color:var(--muted);font-size:13px}
   .live{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--good);display:inline-flex;align-items:center;gap:5px}.live i{width:7px;height:7px;border-radius:50%;background:var(--good);animation:blink 2s infinite}@keyframes blink{50%{opacity:.3}}
   .dbtn{background:var(--surface);border:1px solid var(--line-strong);color:var(--ink);border-radius:9px;padding:7px 12px;font-family:inherit;font-size:13px;cursor:pointer}.dbtn:hover{border-color:var(--accent)}
+  .type-badge{font-size:10px;color:var(--muted);border:1px solid var(--line-strong);border-radius:999px;padding:1px 7px;margin-left:6px;vertical-align:middle}
   .optm{font-size:10.5px;color:var(--faint);border:1px solid var(--line);border-radius:999px;padding:1px 7px;vertical-align:middle}
   .filters{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 15px;box-shadow:var(--shadow);margin-bottom:18px}
   .filter-row{display:flex;gap:20px;flex-wrap:wrap}.fgroup{display:flex;flex-direction:column;gap:6px}
@@ -648,11 +649,12 @@ function renderAdmin(){
   const body=$("adminBody");
   if(!sb){ body.innerHTML='<div class="empty">서버(Supabase) 연결이 필요합니다.</div>'; return; }
   let h=`<h1>⚙️ 설문 관리</h1><p style="color:var(--muted);font-size:13px;margin:0 0 16px"><b>저장 &amp; 활성화</b>하면 응답 폼에 바로 반영됩니다. 지난 회차·응답은 그대로 보관됩니다.</p>`;
-  h+=`<div class="acard"><h3>시식 회차 <button class="abtn primary" id="btnNew" style="float:right">+ 새 시식 만들기</button></h3><div id="surveyList"></div></div>`;
-  h+=`<div class="acard"><h3>브랜드 관리 <button class="abtn primary" id="btnAddBrand" style="float:right">+ 브랜드 등록</button></h3><p style="font-size:11.5px;color:var(--faint);margin:-4px 0 10px">여기 등록한 브랜드는 모든 설문의 제품에서 선택할 수 있습니다.</p><div id="brandList"></div></div>`;
+  h+=`<div class="acard"><h3>설문 회차 <span style="float:right;display:flex;gap:6px"><button class="abtn primary" id="btnNew">+ 새 시식</button><button class="abtn" id="btnNewVote">+ 새 투표</button></span></h3>
+    <p style="font-size:11.5px;color:var(--faint);margin:-4px 0 10px"><b>시식</b> = 제품 관능 5축 평가 · <b>투표</b> = 제품 없이 선택 문항만(사내 업무 투표 등)</p><div id="surveyList"></div></div>`;
+  h+=`<div class="acard"><h3>브랜드 관리 <span style="font-weight:400;color:var(--faint);font-size:11.5px">— 시식 설문 전용</span> <button class="abtn primary" id="btnAddBrand" style="float:right">+ 브랜드 등록</button></h3><p style="font-size:11.5px;color:var(--faint);margin:-4px 0 10px">시식 설문의 <b>제품</b>에 붙는 이름표입니다. 투표 설문에는 쓰이지 않습니다.</p><div id="brandList"></div></div>`;
   h+=`<div class="acard"><h3>📱 응답 QR</h3><div id="qrArea"></div></div>`;
   h+=`<div id="editorArea"></div>`;
-  body.innerHTML=h; $("btnNew").onclick=startNew; $("btnAddBrand").onclick=addBrand; renderSurveyList(); renderBrandList(); renderQR();
+  body.innerHTML=h; $("btnNew").onclick=()=>startNew("tasting"); $("btnNewVote").onclick=()=>startNew("vote"); $("btnAddBrand").onclick=addBrand; renderSurveyList(); renderBrandList(); renderQR();
   if(draft&&ed) renderEditor();
 }
 let showArchived=false;
@@ -664,7 +666,7 @@ function renderSurveyList(){
     const acts=isArch
       ? `<button class="abtn" data-act="restore" data-slug="${esc(s.slug)}">복원</button><button class="abtn" data-act="res" data-slug="${esc(s.slug)}">결과</button>`
       : `<button class="abtn" data-act="edit" data-slug="${esc(s.slug)}">편집</button>${s.is_open?'':`<button class="abtn" data-act="act" data-slug="${esc(s.slug)}">활성화</button>`}<button class="abtn" data-act="res" data-slug="${esc(s.slug)}">결과</button><button class="abtn" data-act="arch" data-slug="${esc(s.slug)}" data-open="${s.is_open?1:0}">숨기기</button>`;
-    return `<div class="srow"${isArch?' style="opacity:.55"':''}><div class="si"><b>${esc(s.title||s.slug)}</b>${s.is_open?'<span class="active-badge">응답 폼에 활성</span>':''}${isArch?'<span class="active-badge" style="background:var(--muted)">보관됨</span>':''}<span>${esc(s.slug)} · 응답 ${cnt}명 · ${(s.created_at||'').slice(0,10)}</span></div>
+    return `<div class="srow"${isArch?' style="opacity:.55"':''}><div class="si"><b>${esc(s.title||s.slug)}</b><span class="type-badge">${((s.config&&s.config.blocks)||[]).some(b=>b.type==="product")?"시식":"투표"}</span>${s.is_open?'<span class="active-badge">응답 폼에 활성</span>':''}${isArch?'<span class="active-badge" style="background:var(--muted)">보관됨</span>':''}<span>${esc(s.slug)} · 응답 ${cnt}명 · ${(s.created_at||'').slice(0,10)}</span></div>
       <div class="arow-actions">${acts}</div></div>`;};
   let h=live.length?live.map(s=>row(s,false)).join(""):`<div class="empty" style="padding:14px">표시할 회차가 없습니다. 아래 보관함을 확인하거나 새 시식을 만드세요.</div>`;
   if(arch.length){
@@ -721,10 +723,16 @@ function renderQR(){
     <p style="font-size:11.5px;color:var(--muted);margin-top:10px;padding:9px 11px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px">🔑 <b>관리자 주소(사장·본부용)</b> — 결과·관리 탭은 이 주소로만 보입니다. 북마크 해두세요:<br><span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--accent);user-select:all;word-break:break-all">${esc(url)}#admin</span></p>`;
   $("qrGen").onclick=()=>{const u=$("qrUrl").value.trim();if(!u)return;$("qrbox").innerHTML=`<img width="230" height="230" alt="QR" src="https://api.qrserver.com/v1/create-qr-code/?size=500x500&margin=16&data=${encodeURIComponent(u)}">`;};
 }
-function suggestSlug(){const d=new Date();const base=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-시식";let s=base,n=1;while(SURVEYS.some(x=>x.slug===s)){n++;s=base+"-"+n;}return s;}
-function startNew(){
-  const base=((SURVEYS.find(s=>s.is_open)||SURVEYS[0]||{}).config)||CFG;
-  draft=JSON.parse(JSON.stringify(base)); draft.slug=suggestSlug(); draftIsNew=true; buildEditModel(); renderAdmin();
+function suggestSlug(kind){const d=new Date();const base=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+(kind==="vote"?"투표":"시식");let s=base,n=1;while(SURVEYS.some(x=>x.slug===s)){n++;s=base+"-"+n;}return s;}
+function voteTemplate(){
+  return {slug:"",axes:(CFG&&CFG.axes)||[],segments:(CFG&&CFG.segments)||{gender:["남","여"],age:["20대","30대","40대 이상"]},rubric:(CFG&&CFG.rubric)||[],
+    meta:{title:"업무 투표",intro:"아래 항목을 골라 주세요.",askProfile:false,showRubric:false,brands:[]},
+    blocks:[{type:"choice",q:"q"+Math.random().toString(36).slice(2,7),label:"어느 쪽이 좋습니까?",opts:["A안","B안"],row:true},
+            {type:"text",q:"q"+Math.random().toString(36).slice(2,7),label:"그렇게 생각한 이유 (선택)"}]};
+}
+function startNew(kind){
+  const base=kind==="vote"?voteTemplate():(((SURVEYS.find(s=>s.is_open)||SURVEYS[0]||{}).config)||CFG);
+  draft=JSON.parse(JSON.stringify(base)); draft.slug=suggestSlug(kind); draftIsNew=true; buildEditModel(); renderAdmin();
   setTimeout(()=>{const e=$("editorArea");if(e)e.scrollIntoView({behavior:"smooth"});},60);
 }
 function editSurvey(slug){
@@ -751,14 +759,14 @@ function buildEditModel(){
 function renderEditor(){
   const el=$("editorArea");
   let h=`<div class="acard"><h3>👁 미리보기 <span style="font-weight:400;color:var(--faint);font-size:11px">— 응답자에게 보이는 화면 (편집하면 실시간 반영)</span></h3><div class="prev-wrap"><div id="previewBody" class="prev-body"></div></div></div>`;
-  h+=`<div class="acard"><h3>${draftIsNew?'새 시식 만들기':'회차 편집'} <button class="abtn ghost" id="edCancel" style="float:right">닫기</button></h3>`;
+  h+=`<div class="acard"><h3>${draftIsNew?(ed.products.length?"새 시식 만들기":"새 투표 설문 만들기"):("회차 편집 · "+(ed.products.length?"시식":"투표"))} <button class="abtn ghost" id="edCancel" style="float:right">닫기</button></h3>`;
   h+=`<div class="fld"><label>회차 ID</label><input id="ed_slug" value="${esc(ed.slug)}" ${draftIsNew?'':'readonly style="opacity:.6"'}></div>`;
   h+=`<div class="fld"><label>제목</label><input id="ed_title" value="${esc(ed.title)}"></div>`;
   h+=`<div class="fld"><label>소개 문구</label><textarea id="ed_intro" rows="2">${esc(ed.intro)}</textarea></div>`;
   h+=`<div class="fld"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="ed_rubric" ${ed.showRubric?'checked':''} style="width:auto;margin:0"> 점수 기준 보기 표시 <span style="color:var(--faint);font-weight:400;font-size:11px">(껐다 켰다 가능 · 응답 폼 상단 안내)</span></label></div>`;
   h+=`<div class="fld"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="ed_ask" ${ed.askProfile?"checked":""} style="width:auto;margin:0"> 응답자 정보(성별·연령) 받기 <span style="color:var(--faint);font-weight:400;font-size:11px">(끄면 완전 익명 — 사내 투표처럼 소수가 응답할 때 권장)</span></label></div>`;
-  h+=`<p style="font-size:11.5px;color:var(--faint);margin:0 0 12px">브랜드는 위 <b>브랜드 관리</b>에서 등록하면 아래 제품의 브랜드 목록에 자동으로 나타납니다.</p>`;
-  h+=`<div class="fld"><label>제품 <span style="color:var(--faint)">(제품마다 관능 5축 자동 포함 · <b>업무 투표 등 관능평가가 필요 없으면 비워 두세요</b>)</span></label><div id="ed_products"></div><button class="addbtn" id="addProduct">+ 제품</button></div>`;
+  if(ed.products.length) h+=`<p style="font-size:11.5px;color:var(--faint);margin:0 0 12px">브랜드는 위 <b>브랜드 관리</b>에서 등록하면 아래 제품의 브랜드 목록에 자동으로 나타납니다.</p>`;
+  h+=`<div class="fld"><label>제품 <span style="color:var(--faint)">${ed.products.length?"(제품마다 관능 5축이 자동으로 붙습니다)":"(비어 있음 = <b>투표 설문</b>. 제품을 추가하면 관능 5축이 붙는 시식 설문이 됩니다)"}</span></label><div id="ed_products"></div><button class="addbtn" id="addProduct">+ 제품</button></div>`;
   h+=`<div class="fld"><label>문항 <span style="color:var(--faint)">(선택 투표 · 사진 투표 · 자유 의견)</span></label><div id="ed_extras"></div><button class="addbtn" id="addExtra">+ 문항</button></div>`;
   h+=`<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="abtn primary" id="edSaveAct">저장 &amp; 응답 폼에 활성화</button><button class="abtn" id="edSave">저장만</button></div></div>`;
   el.innerHTML=h;
@@ -788,6 +796,7 @@ function renderBrandRows(){
 }
 function renderProductRows(){
   const el=$("ed_products");const bopts=regBrandNames();
+  if(ed.products.length&&!bopts.length){ el.innerHTML=`<div class="empty" style="padding:10px;font-size:12px">먼저 위 <b>브랜드 관리</b>에서 브랜드를 등록해 주세요. 제품에 붙일 이름표가 필요합니다.</div>`; return; }
   el.innerHTML=ed.products.map((p,i)=>`<div class="erow" style="grid-template-columns:1fr 1.2fr 1fr 38px"><select data-i="${i}">${bopts.map(n=>`<option ${n===p.brand?'selected':''}>${esc(n)}</option>`).join("")}</select><input value="${esc(p.name)}" data-i="${i}" data-k="name" placeholder="제품명"><input value="${esc(p.tag)}" data-i="${i}" data-k="tag" placeholder="태그(예: 칼국수·기본)"><button class="del" data-i="${i}">×</button></div>`).join("");
   el.querySelectorAll("input").forEach(inp=>inp.oninput=e=>{ed.products[+e.target.dataset.i][e.target.dataset.k]=e.target.value;});
   el.querySelectorAll("select").forEach(s=>s.onchange=e=>{ed.products[+e.target.dataset.i].brand=e.target.value;});
