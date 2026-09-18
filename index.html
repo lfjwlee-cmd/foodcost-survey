@@ -474,11 +474,11 @@ function renderDash(){
   const HASP=hasProd();
   let dh=`<div class="kpis" id="kpis"></div><div class="insight" id="insight"></div>`;
   if(HASP){
-    dh+=`<div class="grid g2 block"><div class="card"><h2>🚦 제품 랭킹 · 출시 판정</h2><p class="cap">관능 5축 평균 기준</p><div style="overflow-x:auto"><table id="rankTable"></table></div></div>
-      <div class="card"><h2>🔥 세그먼트 × 맛 히트맵</h2><p class="cap">연령대별 5축 평균</p><div class="heat" id="heat"></div></div></div>
-      <section class="card block"><h2 style="margin-bottom:12px">제품 상세</h2><div class="prod-picker" id="prodPicker"></div>
+    dh+=`<section class="card block"><h2 style="margin-bottom:12px">제품 상세</h2><div class="prod-picker" id="prodPicker"></div>
       <div class="grid g2"><div><p class="cap" style="margin-bottom:2px">관능 프로필</p><div class="radar-wrap"><svg id="radar" width="300" height="240" viewBox="0 0 300 240"></svg></div><div class="radar-legend" id="radarLegend"></div></div>
       <div id="votes"></div></div></section>
+      <div class="grid g2 block"><div class="card"><h2>🚦 제품 랭킹 · 출시 판정</h2><p class="cap" id="rankCap">관능 5축 평균 기준</p><div style="overflow-x:auto"><table id="rankTable"></table></div></div>
+      <div class="card"><h2>🔥 세그먼트 × 맛 히트맵</h2><p class="cap">연령대별 5축 평균</p><div class="heat" id="heat"></div></div></div>
       <div class="grid g2 block"><div class="card"><h2>💬 종합 의견</h2><p class="cap">자유 서술</p><div id="opinions"></div></div>
       <div class="card"><h2>🗳️ 선택·투표 집계</h2><p class="cap">가격·선호·모듈</p><div id="tally"></div></div></div>`;
   }else{
@@ -489,9 +489,9 @@ function renderDash(){
   $("dbody").innerHTML=dh;
   renderKpis(ev,resp);renderInsight(ev,resp);
   if(HASP){
-    renderRank(ev);renderHeat(ev);
     if(dstate.product>=names.length)dstate.product=0;
     renderPicker(names);renderDetail(names);
+    renderRank(ev);renderHeat(ev);
   }
   renderOpinions(resp);renderTally(resp);
 }
@@ -542,13 +542,18 @@ function renderInsight(ev,resp){
    n<MIN_JUDGE: 판정 보류 / m이 높아도 n<MIN_GO면 초록(출시권장) 대신 '유망(표본 더 필요)' */
 const MIN_JUDGE=3, MIN_GO=5;
 function signal(m,n){
-  if(!(n>=MIN_JUDGE)) return `<span class="signal" style="background:var(--surface-2);color:var(--muted);border:1px dashed var(--line-strong)">⚪ 표본부족 · 판정보류 (n&lt;${MIN_JUDGE})</span>`;
-  if(m>=4) return n>=MIN_GO ? `<span class="signal sig-go">🟢 출시권장</span>` : `<span class="signal sig-hold">🟡 유망 · 표본 더 필요 (n&lt;${MIN_GO})</span>`;
+  if(!(n>=MIN_JUDGE)) return `<span class="signal" style="background:var(--surface-2);color:var(--muted);border:1px dashed var(--line-strong)">⚪ 판정보류</span>`;
+  if(m>=4) return n>=MIN_GO ? `<span class="signal sig-go">🟢 출시권장</span>` : `<span class="signal sig-hold">🟡 유망</span>`;
   if(m>=3.3) return `<span class="signal sig-hold">🟡 보완</span>`;
   return `<span class="signal sig-no">🔴 재검토</span>`;
 }
 function renderRank(ev){const t=$("rankTable");const names=[...new Set(ev.map(e=>e.name))];if(!names.length){t.innerHTML=`<tr><td class="empty">데이터 없음</td></tr>`;return;}
   const rows=names.map(nm=>{const pe=ev.filter(e=>e.name===nm);return{p:pe[0],m:avg(pe.map(x=>mean5(x.s))),taste:avg(pe.map(x=>x.s.taste||0)),n:pe.length};}).sort((a,b)=>b.m-a.m);
+  const cap=$("rankCap");
+  if(cap){ const minN=Math.min(...rows.map(x=>x.n));
+    cap.innerHTML= minN<MIN_JUDGE ? `관능 5축 평균 기준 · <b>표본 ${minN}명 — 판정 보류 구간</b>`
+      : (minN<MIN_GO ? `관능 5축 평균 기준 · 표본 ${minN}명 — ${MIN_GO}명 이상부터 <b>출시권장</b> 판정`
+      : `관능 5축 평균 기준`); }
   t.innerHTML=`<thead><tr><th>제품</th><th>관능</th><th>맛</th><th>n</th><th>판정</th></tr></thead><tbody>`+rows.map(x=>`<tr>
     <td class="prod-cell"><b><span class="brand-dot" style="background:${brandColor(x.p.brand)}"></span>${esc(x.p.name)}</b><span>${esc(x.p.brand)} · ${esc(x.p.cat||"")}</span></td>
     <td class="score-b">${f1(x.m)}</td><td class="score-b">${f1(x.taste)}</td><td class="num" style="color:var(--faint)">${x.n}</td><td>${signal(x.m,x.n)}</td></tr>`).join("")+`</tbody>`;}
@@ -603,7 +608,7 @@ function openReport(){
   const slug=viewSlug||CFG.slug||"설문";const evA=evAll();
   const names=[...new Set(evA.map(e=>e.name))];
   const rank=names.map(nm=>{const pe=evA.filter(e=>e.name===nm);return{name:pe[0].name,brand:pe[0].brand,m:avg(pe.map(x=>mean5(x.s))),axes:AXES.map(a=>avg(pe.map(x=>x.s[a.key]||0))),n:pe.length};}).sort((a,b)=>b.m-a.m);
-  const sigTxt=(m,n)=>!(n>=MIN_JUDGE)?`⚪ 표본부족·판정보류(n<${MIN_JUDGE})`:m>=4?(n>=MIN_GO?'🟢 출시권장':`🟡 유망·표본↑(n<${MIN_GO})`):m>=3.3?'🟡 보완':'🔴 재검토';
+  const sigTxt=(m,n)=>!(n>=MIN_JUDGE)?'⚪ 판정보류':m>=4?(n>=MIN_GO?'🟢 출시권장':'🟡 유망'):m>=3.3?'🟡 보완':'🔴 재검토';
   const segCounts={};ROWS.forEach(r=>{const k=`${r.age||'-'} ${r.gender||'-'}`;segCounts[k]=(segCounts[k]||0)+1;});
   const tblocks=CFG.blocks.filter(b=>(b.type==="price"||b.type==="choice"||b.type==="imgchoice"||(b.type==="module"&&b.opts&&b.opts.length)));
   const texts=CFG.blocks.filter(b=>b.type==="text").map(b=>b.q);
@@ -625,7 +630,9 @@ function openReport(){
   `;
   if(HASP){ html+=`<h2>제품 랭킹 · 출시 판정</h2>
   <table><tr><th class="l">제품</th><th>브랜드</th>${AX.map(a=>`<th>${esc(a)}</th>`).join("")}<th>종합</th><th>n</th><th>판정</th></tr>
-  ${rank.map(x=>`<tr><td class="l">${esc(x.name)}</td><td>${esc(x.brand||"")}</td>${x.axes.map(v=>`<td>${f1(v)}</td>`).join("")}<td><b>${f1(x.m)}</b></td><td>${x.n}</td><td>${sigTxt(x.m,x.n)}</td></tr>`).join("")}</table>`; }
+  ${rank.map(x=>`<tr><td class="l">${esc(x.name)}</td><td>${esc(x.brand||"")}</td>${x.axes.map(v=>`<td>${f1(v)}</td>`).join("")}<td><b>${f1(x.m)}</b></td><td>${x.n}</td><td>${sigTxt(x.m,x.n)}</td></tr>`).join("")}</table>`;
+    const minN=rank.length?Math.min(...rank.map(x=>x.n)):0;
+    if(minN<MIN_GO) html+=`<p style="font-size:11px;color:#6f6b64;margin:-2px 0 8px">※ 표본 ${minN}명. ${MIN_JUDGE}명 미만은 판정 보류, ${MIN_GO}명 이상부터 출시권장 판정이 나옵니다.</p>`; }
   if(tblocks.length){html+=`<h2>선택 · 투표 집계</h2>`;tblocks.forEach(b=>{const opts=(b.opts||[]).map(o=>b.type==="imgchoice"?o.label:o);const counts=opts.map(o=>ROWS.filter(r=>(r.extras||{})[b.q]===o).length);const tot=counts.reduce((a,c)=>a+c,0)||1;html+=`<div style="margin-bottom:8px"><b style="font-size:12.5px">${esc(b.label)}</b><table style="margin-top:3px"><tr>${opts.map(o=>`<th>${esc(o)}</th>`).join("")}</tr><tr>${counts.map(c=>`<td>${c}표 (${Math.round(c/tot*100)}%)</td>`).join("")}</tr></table></div>`;});}
   if(ASKP) html+=`<h2>응답자 구성</h2><table><tr>${Object.keys(segCounts).map(k=>`<th>${esc(k)}</th>`).join("")}</tr><tr>${Object.values(segCounts).map(v=>`<td>${v}명</td>`).join("")}</tr></table>`;
   if(ops.length){html+=`<h2>종합 의견 (${ops.length}건)</h2>`+ops.slice(0,40).map(o=>`<div class="op">${esc(o.t)}<div class="m">${esc(o.meta)}</div></div>`).join("");}
