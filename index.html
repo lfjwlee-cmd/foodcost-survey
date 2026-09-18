@@ -205,7 +205,7 @@
   <div id="dash" class="wrap hidden">
     <div class="dash-head">
       <div><h1>시식 평가 결과</h1><div class="sub" id="dsub">집계 중…</div></div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="live"><i></i> 실시간</span><select class="dbtn" id="roundSel" title="시식 회차"></select><button class="dbtn" id="refreshBtn" style="font-weight:600">↻ 새로고침</button><button class="dbtn" id="reportBtn">📄 보고서(PDF)</button><button class="dbtn" id="csvBtn">엑셀(CSV)</button></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="live"><i></i> 실시간</span><select class="dbtn" id="roundSel" title="시식 회차"></select><button class="dbtn" id="refreshBtn" style="font-weight:600">↻ 새로고침</button><button class="dbtn" id="reportBtn">📄 보고서(PDF)</button><button class="dbtn" id="csvBtn">📊 엑셀 저장</button></div>
     </div>
     <div class="banner" id="cfgBanner">⚠ Supabase 키가 설정되지 않았습니다.</div>
     <div class="filters"><div class="filter-row">
@@ -229,6 +229,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="config.js"></script>
 <script>
 "use strict";
@@ -420,7 +421,7 @@ const dstate={brand:"전체",age:"전체",gender:"전체",product:0};
 async function startDash(){
   $("lockPanel").classList.add("hidden");$("dash").classList.remove("hidden");
   if(!sb){$("cfgBanner").style.display="block";}
-  if(!dashStarted){ dashStarted=true; if(timer)clearInterval(timer); timer=setInterval(loadDash,15000); $("csvBtn").onclick=exportCsv; $("reportBtn").onclick=openReport; $("refreshBtn").onclick=async()=>{await populateRounds();await loadDash();}; }
+  if(!dashStarted){ dashStarted=true; if(timer)clearInterval(timer); timer=setInterval(loadDash,15000); $("csvBtn").onclick=exportXlsx; $("reportBtn").onclick=openReport; $("refreshBtn").onclick=async()=>{await populateRounds();await loadDash();}; }
   await populateRounds(); loadDash();
 }
 async function populateRounds(){
@@ -509,7 +510,8 @@ function tallyOf(b,resp){
   const counts=opts.map(o=>resp.filter(r=>(r.extras||{})[b.q]===o).length);
   const mx=Math.max(0,...counts); const i=counts.indexOf(mx);
   const answered=counts.reduce((a,c)=>a+c,0);
-  return {label:b.label,top:mx>0?opts[i]:null,topN:mx,answered,opts,counts};
+  const tops=mx>0?opts.filter((o,j)=>counts[j]===mx):[];
+  return {label:b.label,top:mx>0?opts[i]:null,tops,tie:tops.length>1,topN:mx,answered,opts,counts};
 }
 function renderVoteKpis(resp){
   const pbs=pickBlocks(); const first=pbs.length?tallyOf(pbs[0],resp):null;
@@ -519,7 +521,7 @@ function renderVoteKpis(resp){
   $("kpis").innerHTML=[
     ["응답자 수",`${resp.length}<small> 명</small>`,"총 제출"],
     ["투표 문항",`${pbs.length}<small> 개</small>`,"선택형 기준"],
-    ["1순위",first&&first.top?esc(first.top):"—",first?esc(first.label):"선택 문항 없음"],
+    ["1순위",first&&first.top?esc(first.tops.join(", ")):"—",first?(first.tie?"⚖ 동점 · ":"")+esc(first.label):"선택 문항 없음"],
     ["1순위 지지율",first&&first.top?`${share}<small> %</small>`:"—",first&&first.top?`${first.topN}/${first.answered}명`:"—"],
     ["자유 의견",`${opinions}<small> 건</small>`,"서술형 응답"]
   ].map(([l,v,n])=>`<div class="kpi"><div class="k-label">${l}</div><div class="k-val num">${v}</div><div class="k-note">${n}</div></div>`).join("");
@@ -528,7 +530,7 @@ function renderInsight(ev,resp){
   if(!hasProd()){
     const el=$("insight"); const pbs=pickBlocks();
     if(!resp||!resp.length){el.innerHTML="아직 응답이 없습니다.";return;}
-    const parts=pbs.map(b=>tallyOf(b,resp)).filter(t=>t.top).map(t=>`<b>${esc(t.label)}</b> → ${esc(t.top)} (${t.topN}표)`);
+    const parts=pbs.map(b=>tallyOf(b,resp)).filter(t=>t.top).map(t=>`<b>${esc(t.label)}</b> → ${esc(t.tops.join(", "))} (${t.topN}표${t.tie?" · 동점":""})`);
     el.innerHTML="💡 "+(parts.length?parts.join(" · "):"집계할 선택 문항이 없습니다.");
     return;
   }
@@ -592,15 +594,132 @@ function renderTally(resp){const el=$("tally");const blocks=CFG.blocks.filter(b=
       h+=`<div class="bar-row"><div class="${i===win&&counts[i]>0?'winner':''}" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${th}${esc(o.label)}</div><div class="bar-track"><div class="bar-fill${i===win?'':' alt'}" style="width:${counts[i]/max*100}%"></div></div><div class="bar-val">${counts[i]}표</div></div>`;});
     h+=`<div style="height:12px"></div>`;});
   el.innerHTML=h;}
+/* 판정 텍스트(아이콘 없는 순수 문자열) — 화면·PDF·엑셀이 같은 기준을 쓴다 */
+function sigPlain(m,n){
+  if(!(n>=MIN_JUDGE)) return "판정보류";
+  if(m>=4) return n>=MIN_GO ? "출시권장" : "유망";
+  if(m>=3.3) return "보완";
+  return "재검토";
+}
+/* ISO(UTC) 문자열을 현지 시각 문자열로. 엑셀에서 그대로 읽힌다 */
+function fmtTime(v){
+  if(!v) return "";
+  const d=new Date(v); if(isNaN(d.getTime())) return String(v);
+  const z=x=>String(x).padStart(2,"0");
+  return d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate())+" "+z(d.getHours())+":"+z(d.getMinutes());
+}
+/* 같은 라벨이 여러 개면 뒤에 번호를 붙여 열이 겹치지 않게 한다 */
+function uniqLabels(arr){
+  const c={};
+  return arr.map(v=>{const k=(String(v||"").trim())||"문항";
+    if(c[k]==null){c[k]=1;return k;} c[k]++; return k+" ("+c[k]+")";});
+}
+function freeBlocks(){return CFG.blocks.filter(b=>b.type==="text"||(b.type==="module"&&b.input==="text"));}
+function addSheet(wb,name,aoa,widths){
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"]=(widths||[]).map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb,ws,name);
+}
+function exportXlsx(){
+  if(!ROWS.length){alert("응답이 없습니다.");return;}
+  if(!window.XLSX){alert("엑셀 모듈을 불러오지 못했습니다(네트워크 확인). CSV로 저장합니다.");exportCsv();return;}
+  const slug=viewSlug||CFG.slug||"설문";
+  const HASP=hasProd(), ASKP=askProfile();
+  const prodBlocks=CFG.blocks.filter(b=>b.type==="product");
+  const tBlocks=pickBlocks(), fBlocks=freeBlocks();
+  const evA=evAll();
+  const wb=XLSX.utils.book_new();
+
+  /* 시트 1. 요약 */
+  const sum=[["회차",slug],["제목",(CFG.meta&&CFG.meta.title)||""],
+             ["유형",HASP?"시식 평가":"투표"],["총 응답",ROWS.length],
+             ["내보낸 시각",fmtTime(new Date())],[]];
+  if(HASP){
+    const names=[...new Set(evA.map(e=>e.name))];
+    const rank=names.map(nm=>{const pe=evA.filter(e=>e.name===nm);
+      return {name:nm,brand:pe[0].brand||"",axes:AXES.map(a=>+f1(avg(pe.map(x=>x.s[a.key]||0)))),
+              m:+f1(avg(pe.map(x=>mean5(x.s)))),n:pe.length};}).sort((a,b)=>b.m-a.m);
+    sum.push(["제품 랭킹"]);
+    sum.push(["순위","제품","브랜드"].concat(AXES.map(a=>a.label)).concat(["종합","응답수","판정"]));
+    rank.forEach((x,i)=>sum.push([i+1,x.name,x.brand].concat(x.axes).concat([x.m,x.n,sigPlain(x.m,x.n)])));
+    sum.push([]);
+    sum.push(["※ 판정 기준: 응답 "+MIN_JUDGE+"명 미만은 판정보류 / 종합 4.0 이상이면서 "+MIN_GO+"명 이상이면 출시권장 / 3.3 이상 보완 / 그 미만 재검토"]);
+  }else{
+    sum.push(["문항별 1순위"]);
+    sum.push(["문항","1순위","득표","응답 수","지지율(%)","비고"]);
+    tBlocks.forEach(b=>{const t=tallyOf(b,ROWS);
+      sum.push([b.label||b.q,t.tops.length?t.tops.join(", "):"-",t.topN,t.answered,
+        t.answered?Math.round(t.topN/t.answered*100):0,t.tie?"동점 "+t.tops.length+"개":""]);});
+  }
+  addSheet(wb,"요약",sum,HASP?[8,24,14].concat(AXES.map(()=>10)).concat([9,9,12]):[34,26,8,9,11,13]);
+
+  /* 시트 2. 세그먼트별 평균 (시식 + 응답자 정보 수집 시에만) */
+  if(HASP&&ASKP){
+    const seg=[["연령대 × 축 평균"],["연령대"].concat(AXES.map(a=>a.label)).concat(["응답수"])];
+    (CFG.segments.age||[]).forEach(age=>{const sub=evA.filter(e=>e.age===age);
+      seg.push([age].concat(AXES.map(a=>{const v=sub.map(e=>e.s[a.key]).filter(x=>typeof x==="number");
+        return v.length?+f1(avg(v)):"";})).concat([ROWS.filter(r=>r.age===age).length]));});
+    seg.push([]);
+    seg.push(["성별 × 축 평균"]);
+    seg.push(["성별"].concat(AXES.map(a=>a.label)).concat(["응답수"]));
+    (CFG.segments.gender||[]).forEach(g=>{const sub=evA.filter(e=>e.gender===g);
+      seg.push([g].concat(AXES.map(a=>{const v=sub.map(e=>e.s[a.key]).filter(x=>typeof x==="number");
+        return v.length?+f1(avg(v)):"";})).concat([ROWS.filter(r=>r.gender===g).length]));});
+    addSheet(wb,"세그먼트",seg,[14].concat(AXES.map(()=>10)).concat([9]));
+  }
+
+  /* 시트 3. 문항 집계 */
+  if(tBlocks.length){
+    const tal=[["문항","선택지","응답수","비율(%)"]];
+    tBlocks.forEach(b=>{const t=tallyOf(b,ROWS);
+      t.opts.forEach((o,i)=>tal.push([b.label||b.q,o,t.counts[i],t.answered?Math.round(t.counts[i]/t.answered*100):0]));
+      tal.push([]);});
+    addSheet(wb,"문항 집계",tal,[34,26,9,10]);
+  }
+
+  /* 시트 4. 응답 원자료 (한 행 = 한 응답) */
+  const qCols=CFG.blocks.filter(b=>b.q);
+  const prodCols=[].concat.apply([],prodBlocks.map(pb=>AXES.map(a=>pb.name+" · "+a.label)));
+  const head=["번호","응답 시각"].concat(ASKP?["성별","연령대"]:[])
+    .concat(prodCols).concat(uniqLabels(qCols.map(b=>b.label||b.q)));
+  const raw=[head];
+  ROWS.forEach((r,i)=>{
+    const row=[i+1,fmtTime(r.created_at)].concat(ASKP?[r.gender||"",r.age||""]:[]);
+    prodBlocks.forEach(pb=>{const it=(r.items||[]).find(x=>x.name===pb.name)||{};
+      AXES.forEach(a=>row.push(typeof it[a.key]==="number"?it[a.key]:""));});
+    qCols.forEach(b=>row.push((r.extras||{})[b.q]??""));
+    raw.push(row);
+  });
+  addSheet(wb,"응답 원자료",raw,[6,17].concat(ASKP?[8,11]:[])
+    .concat(prodCols.map(()=>12)).concat(qCols.map(()=>22)));
+
+  /* 시트 5. 자유 의견 */
+  if(fBlocks.length){
+    const ops=[["번호","응답 시각"].concat(ASKP?["성별","연령대"]:[]).concat(["문항","내용"])];
+    let k=0;
+    ROWS.forEach(r=>fBlocks.forEach(b=>{
+      const v=(r.extras||{})[b.q];
+      if(v&&String(v).trim()&&v!=="."&&v!=="-"){k++;
+        ops.push([k,fmtTime(r.created_at)].concat(ASKP?[r.gender||"",r.age||""]:[]).concat([b.label||b.q,String(v)]));}
+    }));
+    if(k) addSheet(wb,"자유 의견",ops,[6,17].concat(ASKP?[8,11]:[]).concat([26,70]));
+  }
+
+  XLSX.writeFile(wb,slug+"_결과.xlsx");
+}
 function exportCsv(){
   if(!ROWS.length)return;
-  const prodBlocks=CFG.blocks.filter(b=>b.type==="product");const extraQs=CFG.blocks.filter(b=>b.q).map(b=>b.q);
-  const head=["시간","성별","연령"];prodBlocks.forEach(p=>AXES.forEach(a=>head.push(`${p.name}_${a.label}`)));extraQs.forEach(q=>head.push(q));
-  const lines=[head.join(",")];
-  ROWS.forEach(r=>{const row=[r.created_at,r.gender,r.age];
+  const prodBlocks=CFG.blocks.filter(b=>b.type==="product");const qCols=CFG.blocks.filter(b=>b.q);
+  const cell=v=>{v=String(v??"");v=v.split('"').join('""');
+    return (/[",]/.test(v)||v.indexOf(String.fromCharCode(10))>=0)?'"'+v+'"':v;};
+  const head=["응답 시각","성별","연령대"];
+  prodBlocks.forEach(p=>AXES.forEach(a=>head.push(p.name+" · "+a.label)));
+  uniqLabels(qCols.map(b=>b.label||b.q)).forEach(l=>head.push(l));
+  const lines=[head.map(cell).join(",")];
+  ROWS.forEach(r=>{const row=[fmtTime(r.created_at),r.gender||"",r.age||""];
     prodBlocks.forEach(p=>{const it=(r.items||[]).find(x=>x.name===p.name)||{};AXES.forEach(a=>row.push(it[a.key]??""));});
-    extraQs.forEach(q=>{let v=(r.extras||{})[q]??"";v=String(v).replace(/"/g,'""');row.push(/[",\n]/.test(v)?`"${v}"`:v);});
-    lines.push(row.join(","));});
+    qCols.forEach(b=>row.push((r.extras||{})[b.q]??""));
+    lines.push(row.map(cell).join(","));});
   const blob=new Blob(["﻿"+lines.join("\n")],{type:"text/csv;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`${viewSlug||CFG.slug||"설문"}_결과.csv`;a.click();
 }
 function openReport(){
@@ -608,7 +727,8 @@ function openReport(){
   const slug=viewSlug||CFG.slug||"설문";const evA=evAll();
   const names=[...new Set(evA.map(e=>e.name))];
   const rank=names.map(nm=>{const pe=evA.filter(e=>e.name===nm);return{name:pe[0].name,brand:pe[0].brand,m:avg(pe.map(x=>mean5(x.s))),axes:AXES.map(a=>avg(pe.map(x=>x.s[a.key]||0))),n:pe.length};}).sort((a,b)=>b.m-a.m);
-  const sigTxt=(m,n)=>!(n>=MIN_JUDGE)?'⚪ 판정보류':m>=4?(n>=MIN_GO?'🟢 출시권장':'🟡 유망'):m>=3.3?'🟡 보완':'🔴 재검토';
+  const ICON={판정보류:"⚪",출시권장:"🟢",유망:"🟡",보완:"🟡",재검토:"🔴"};
+  const sigTxt=(m,n)=>{const t=sigPlain(m,n);return ICON[t]+" "+t;};
   const segCounts={};ROWS.forEach(r=>{const k=`${r.age||'-'} ${r.gender||'-'}`;segCounts[k]=(segCounts[k]||0)+1;});
   const tblocks=CFG.blocks.filter(b=>(b.type==="price"||b.type==="choice"||b.type==="imgchoice"||(b.type==="module"&&b.opts&&b.opts.length)));
   const texts=CFG.blocks.filter(b=>b.type==="text").map(b=>b.q);
