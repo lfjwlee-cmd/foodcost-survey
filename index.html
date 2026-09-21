@@ -565,7 +565,11 @@ function otherAxisAvg(sc){
 /* 판정 — 화면·PDF·엑셀이 전부 이 함수를 거친다. n을 생략하면 표본 게이트 없이 순수 점수만 판정(집계용 KPI 등) */
 function verdictOf(taste,sensory,n){
   if(typeof n==="number" && n<MIN_SAMPLE) return {cls:"",icon:"⚪",text:"표본 부족",lowN:true};
-  const tOk=taste>=TASTE_MIN, sOk=sensory>=SENSORY_MIN;
+  // 화면엔 소수 둘째 자리에서 반올림한 값(예: 4.1875→"4.2")이 보이는데 판정은 반올림 전 원값으로
+  // 비교하면, 표시상 기준과 같아 보이는데 판정은 떨어지는 것처럼 보이는 불일치가 생긴다.
+  // 판정도 화면에 보이는 것과 같은 반올림 값으로 비교해 "보이는 대로 판정"되게 한다.
+  const r1=v=>Math.round(v*10)/10;
+  const tOk=r1(taste)>=TASTE_MIN, sOk=r1(sensory)>=SENSORY_MIN;
   if(tOk&&sOk) return {cls:"sig-go",icon:"🟢",text:"다음 단계 진행"};
   if(!tOk&&!sOk) return {cls:"sig-no",icon:"🔴",text:"맛·관능 보강"};
   if(!tOk) return {cls:"sig-hold",icon:"🟡",text:"맛 보강"};
