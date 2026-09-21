@@ -555,8 +555,8 @@ function renderInsight(ev,resp){
 }
 /* 판정 기준 — 맛과 관능(맛을 뺀 나머지 4축 평균)을 각각 임계값과 비교한다.
    표본 MIN_SAMPLE명 미만이면 판정 대신 "표본 부족".
-   맛<TASTE_MIN → 맛 보강 / 관능<SENSORY_MIN → 관능 수정 / 둘 다 미달 → 맛·관능 보강 / 둘 다 충족 → 다음 사항 진행 */
-const TASTE_MIN=4.5, SENSORY_MIN=4.0, MIN_SAMPLE=3;
+   맛<TASTE_MIN → 맛 보강 / 관능<SENSORY_MIN → 관능 수정 / 둘 다 미달 → 맛·관능 보강 / 둘 다 충족 → 다음 단계 진행 */
+const TASTE_MIN=4.2, SENSORY_MIN=4.2, MIN_SAMPLE=3;
 /* "관능" = 맛(taste)을 제외한 나머지 축들의 평균 */
 function otherAxisAvg(sc){
   const vals=AXES.filter(a=>a.key!=="taste").map(a=>sc[a.key]).filter(v=>typeof v==="number");
@@ -566,7 +566,7 @@ function otherAxisAvg(sc){
 function verdictOf(taste,sensory,n){
   if(typeof n==="number" && n<MIN_SAMPLE) return {cls:"",icon:"⚪",text:"표본 부족",lowN:true};
   const tOk=taste>=TASTE_MIN, sOk=sensory>=SENSORY_MIN;
-  if(tOk&&sOk) return {cls:"sig-go",icon:"🟢",text:"다음 사항 진행"};
+  if(tOk&&sOk) return {cls:"sig-go",icon:"🟢",text:"다음 단계 진행"};
   if(!tOk&&!sOk) return {cls:"sig-no",icon:"🔴",text:"맛·관능 보강"};
   if(!tOk) return {cls:"sig-hold",icon:"🟡",text:"맛 보강"};
   return {cls:"sig-hold",icon:"🟠",text:"관능 수정"};
@@ -664,7 +664,7 @@ function exportXlsx(){
     sum.push(["순위","제품","브랜드","맛","관능","표본","판정"]);
     rank.forEach((x,i)=>sum.push([i+1,x.name,x.brand,x.taste,x.sensory,x.n,sigPlain(x.taste,x.sensory,x.n)]));
     sum.push([]);
-    sum.push(["※ 판정 기준: 맛 "+TASTE_MIN+" 이상 그리고 관능(그 외 4축 평균) "+SENSORY_MIN+" 이상이면 다음 사항 진행 / 하나라도 미달이면 해당 항목 보강 / 둘 다 미달이면 맛·관능 보강 / 표본 "+MIN_SAMPLE+"명 미만이면 표본 부족"]);
+    sum.push(["※ 판정 기준: 맛 "+TASTE_MIN+" 이상 그리고 관능(그 외 4축 평균) "+SENSORY_MIN+" 이상이면 다음 단계 진행 / 하나라도 미달이면 해당 항목 보강 / 둘 다 미달이면 맛·관능 보강 / 표본 "+MIN_SAMPLE+"명 미만이면 표본 부족"]);
   }else{
     sum.push(["문항별 1순위"]);
     sum.push(["문항","1순위","득표","응답 수","지지율(%)","비고"]);
@@ -771,7 +771,7 @@ function openReport(){
   if(HASP){ html+=`<h2>제품 랭킹 · 출시 판정</h2>
   <table><tr><th class="l">제품</th><th>브랜드</th><th>맛</th><th>관능</th><th>표본</th><th>판정</th></tr>
   ${rank.map(x=>`<tr><td class="l">${esc(x.name)}</td><td>${esc(x.brand||"")}</td><td>${f1(x.taste)}</td><td>${f1(x.sensory)}</td><td>${x.n}</td><td>${sigTxt(x.taste,x.sensory,x.n)}</td></tr>`).join("")}</table>`;
-    html+=`<p style="font-size:11px;color:#6f6b64;margin:-2px 0 8px">※ 맛 ${TASTE_MIN} 이상 그리고 관능(그 외 4축 평균) ${SENSORY_MIN} 이상이면 다음 사항 진행 판정입니다. 표본 ${MIN_SAMPLE}명 미만은 표본 부족으로 표시됩니다.</p>`; }
+    html+=`<p style="font-size:11px;color:#6f6b64;margin:-2px 0 8px">※ 맛 ${TASTE_MIN} 이상 그리고 관능(그 외 4축 평균) ${SENSORY_MIN} 이상이면 다음 단계 진행 판정입니다. 표본 ${MIN_SAMPLE}명 미만은 표본 부족으로 표시됩니다.</p>`; }
   if(tblocks.length){html+=`<h2>선택 · 투표 집계</h2>`;tblocks.forEach(b=>{const opts=(b.opts||[]).map(o=>b.type==="imgchoice"?o.label:o);const counts=opts.map(o=>ROWS.filter(r=>(r.extras||{})[b.q]===o).length);const tot=counts.reduce((a,c)=>a+c,0)||1;html+=`<div style="margin-bottom:8px"><b style="font-size:12.5px">${esc(b.label)}</b><table style="margin-top:3px"><tr>${opts.map(o=>`<th>${esc(o)}</th>`).join("")}</tr><tr>${counts.map(c=>`<td>${c}표 (${Math.round(c/tot*100)}%)</td>`).join("")}</tr></table></div>`;});}
   if(ASKP) html+=`<h2>응답자 구성</h2><table><tr>${Object.keys(segCounts).map(k=>`<th>${esc(k)}</th>`).join("")}</tr><tr>${Object.values(segCounts).map(v=>`<td>${v}명</td>`).join("")}</tr></table>`;
   if(ops.length){html+=`<h2>종합 의견 (${ops.length}건)</h2>`+ops.slice(0,40).map(o=>`<div class="op">${esc(o.t)}<div class="m">${esc(o.meta)}</div></div>`).join("");}
