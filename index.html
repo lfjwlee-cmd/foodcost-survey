@@ -508,7 +508,7 @@ function renderKpis(ev,resp,names){
   const selName=(names&&names.length)?names[dstate.product]:null;
   const selEv=selName?ev.filter(e=>e.name===selName):[];
   const baseEv=selEv.length?selEv:ev; // 필터로 선택 제품이 가려졌으면 필터된 전체로 대체
-  const tasteAvg=baseEv.length?avg(baseEv.map(e=>e.s.taste||0)):0, sensAvg=baseEv.length?avg(baseEv.map(e=>otherAxisAvg(e.s))):0;
+  const tasteAvg=baseEv.length?avg(baseEv.map(e=>tasteAvgOf(e.s))):0, sensAvg=baseEv.length?avg(baseEv.map(e=>otherAxisAvg(e.s))):0;
   /* "○○○ 기준"이라고 명시 — 응답자 수·대상 제품은 전체 집계인데 맛·관능만 제품 하나 값이라,
      제품명만 작게 붙여선 여전히 "이것도 전체 평균인가?"로 읽혔다. "기준"을 붙여 명확히 한다. */
   const tag=selEv.length?`${esc(selName)} 기준`:`기준 ${TASTE_MIN} 이상`;
@@ -549,9 +549,9 @@ function renderInsight(ev,resp){
   }
   const el=$("insight");if(!ev.length){el.innerHTML="선택 조건에 응답이 없습니다.";return;}
   let bp=null;[...new Set(ev.map(e=>e.name))].forEach(nm=>{const pe=ev.filter(e=>e.name===nm);
-    const taste=avg(pe.map(x=>x.s.taste||0)),sensory=avg(pe.map(x=>otherAxisAvg(x.s)));
+    const taste=avg(pe.map(x=>tasteAvgOf(x.s))),sensory=avg(pe.map(x=>otherAxisAvg(x.s)));
     if(!bp||(taste+sensory)>(bp.taste+bp.sensory))bp={taste,sensory,name:nm,brand:pe[0].brand,n:pe.length};});
-  let best=null;CFG.segments.age.forEach(age=>{const sub=ev.filter(e=>e.age===age);if(sub.length){const t=avg(sub.map(e=>e.s.taste||0));if(!best||t>best.t)best={age,t};}});
+  let best=null;CFG.segments.age.forEach(age=>{const sub=ev.filter(e=>e.age===age);if(sub.length){const t=avg(sub.map(e=>tasteAvgOf(e.s)));if(!best||t>best.t)best={age,t};}});
   let msg="";if(bp)msg+=`맛·관능 1위는 <b>${esc(bp.name)}</b>(${esc(bp.brand)}, 맛 ${f1(bp.taste)}·관능 ${f1(bp.sensory)}, 표본 ${bp.n}명${bp.n<MIN_SAMPLE?' · <b>표본 부족</b>':''}). `;if(best)msg+=`'맛'이 가장 높은 연령대는 <b>${esc(best.age)}</b>(${f1(best.t)}/5).`;
   el.innerHTML="💡 "+msg;
 }
@@ -559,9 +559,25 @@ function renderInsight(ev,resp){
    표본 MIN_SAMPLE명 미만이면 판정 대신 "표본 부족".
    맛<TASTE_MIN → 맛 보강 / 관능<SENSORY_MIN → 관능 수정 / 둘 다 미달 → 맛·관능 보강 / 둘 다 충족 → 다음 단계 진행 */
 const TASTE_MIN=4.2, SENSORY_MIN=4.2, MIN_SAMPLE=3;
-/* "관능" = 맛(taste)을 제외한 나머지 축들의 평균 */
+/* 축 그룹 판정 — 새 라운드는 axis.group("taste"/"sensory")을 그대로 쓰고,
+   group이 없는 구형 라운드(축 5개, key==="taste" 축 1개)는 예전과 완전히 같은 결과가 나오도록
+   key 기반으로 자동 추론한다(하위호환) */
+function axisGroup(a){ return a.group || (a.key==="taste" ? "taste" : "sensory"); }
+/* "맛" = taste 그룹 축들의 평균(구형은 1개, 신형은 여러 개일 수 있음) */
+/* 판정 문구에 쓰는 맛/관능 라벨 — 축 그룹 구성이 몇 개든 실제 개수를 그대로 반영한다.
+   구형(맛 1개)은 지금처럼 "맛"만, 3개 이상이면 "맛(N축 평균)"으로 표시 */
+function axisLabels(){
+  const tN=AXES.filter(a=>axisGroup(a)==="taste").length;
+  const sN=AXES.filter(a=>axisGroup(a)!=="taste").length;
+  return { taste: tN>1?`맛(${tN}축 평균)`:"맛", sensory:`관능(그 외 ${sN}축 평균)` };
+}
+function tasteAvgOf(sc){
+  const vals=AXES.filter(a=>axisGroup(a)==="taste").map(a=>sc[a.key]).filter(v=>typeof v==="number");
+  return vals.length?avg(vals):0;
+}
+/* "관능" = sensory 그룹 축들의 평균 */
 function otherAxisAvg(sc){
-  const vals=AXES.filter(a=>a.key!=="taste").map(a=>sc[a.key]).filter(v=>typeof v==="number");
+  const vals=AXES.filter(a=>axisGroup(a)!=="taste").map(a=>sc[a.key]).filter(v=>typeof v==="number");
   return vals.length?avg(vals):0;
 }
 /* 판정 — 화면·PDF·엑셀이 전부 이 함수를 거친다. n을 생략하면 표본 게이트 없이 순수 점수만 판정(집계용 KPI 등) */
@@ -584,16 +600,16 @@ function signal(taste,sensory,n){
 }
 function renderRank(ev){const t=$("rankTable");const names=[...new Set(ev.map(e=>e.name))];if(!names.length){t.innerHTML=`<tr><td class="empty">데이터 없음</td></tr>`;return;}
   const rows=names.map(nm=>{const pe=ev.filter(e=>e.name===nm);
-    return{p:pe[0],taste:avg(pe.map(x=>x.s.taste||0)),sensory:avg(pe.map(x=>otherAxisAvg(x.s))),n:pe.length};
+    return{p:pe[0],taste:avg(pe.map(x=>tasteAvgOf(x.s))),sensory:avg(pe.map(x=>otherAxisAvg(x.s))),n:pe.length};
   }).sort((a,b)=>(b.taste+b.sensory)-(a.taste+a.sensory));
   const cap=$("rankCap");
-  if(cap) cap.innerHTML=`맛 ${TASTE_MIN} 이상 · 관능(그 외 4축 평균) ${SENSORY_MIN} 이상 기준 · 표본 ${MIN_SAMPLE}명 미만은 <b>표본 부족</b>`;
+  if(cap){ const AL=axisLabels(); cap.innerHTML=`${AL.taste} ${TASTE_MIN} 이상 · ${AL.sensory} ${SENSORY_MIN} 이상 기준 · 표본 ${MIN_SAMPLE}명 미만은 <b>표본 부족</b>`; }
   t.innerHTML=`<thead><tr><th>제품</th><th>맛</th><th>관능</th><th>표본</th><th>판정</th></tr></thead><tbody>`+rows.map(x=>`<tr>
     <td class="prod-cell"><b><span class="brand-dot" style="background:${brandColor(x.p.brand)}"></span>${esc(x.p.name)}</b><span>${esc(x.p.brand)} · ${esc(x.p.cat||"")}</span></td>
     <td class="score-b">${f1(x.taste)}</td><td class="score-b">${f1(x.sensory)}</td><td class="num" style="color:var(--faint)">${x.n}</td><td>${signal(x.taste,x.sensory,x.n)}</td></tr>`).join("")+`</tbody>`;}
 function heatColor(v){const t=Math.max(0,Math.min(1,(v-2.5)/2));const hue=8+t*132;const alpha=0.16+0.5*Math.abs(v-3)/2;return `hsl(${hue} 62% 48% / ${alpha})`;}
 function renderHeat(ev){const el=$("heat");el.innerHTML="";const cols=AXES.length;
-  const mk=inner=>{const d=document.createElement("div");d.className="heat-row";d.style.gridTemplateColumns=`70px repeat(${cols},1fr)`;d.innerHTML=inner;return d;};
+  const mk=inner=>{const d=document.createElement("div");d.className="heat-row";d.style.gridTemplateColumns=`70px repeat(${cols},1fr)`;d.style.minWidth=Math.max(430,70+cols*68)+"px";d.innerHTML=inner;return d;};
   el.appendChild(mk(`<div></div>`+AXES.map(a=>`<div class="heat-h">${esc(a.label)}</div>`).join("")));
   const ages=dstate.age==="전체"?CFG.segments.age:[dstate.age];let any=false;
   ages.forEach(age=>{const sub=ev.filter(e=>e.age===age);let c=`<div class="heat-rl">${esc(age)}</div>`;
@@ -664,13 +680,13 @@ function exportXlsx(){
   if(HASP){
     const names=[...new Set(evA.map(e=>e.name))];
     const rank=names.map(nm=>{const pe=evA.filter(e=>e.name===nm);
-      return {name:nm,brand:pe[0].brand||"",taste:+f1(avg(pe.map(x=>x.s.taste||0))),
+      return {name:nm,brand:pe[0].brand||"",taste:+f1(avg(pe.map(x=>tasteAvgOf(x.s)))),
               sensory:+f1(avg(pe.map(x=>otherAxisAvg(x.s)))),n:pe.length};}).sort((a,b)=>(b.taste+b.sensory)-(a.taste+a.sensory));
     sum.push(["제품 랭킹"]);
     sum.push(["순위","제품","브랜드","맛","관능","표본","판정"]);
     rank.forEach((x,i)=>sum.push([i+1,x.name,x.brand,x.taste,x.sensory,x.n,sigPlain(x.taste,x.sensory,x.n)]));
     sum.push([]);
-    sum.push(["※ 판정 기준: 맛 "+TASTE_MIN+" 이상 그리고 관능(그 외 4축 평균) "+SENSORY_MIN+" 이상이면 다음 단계 진행 / 하나라도 미달이면 해당 항목 보강 / 둘 다 미달이면 맛·관능 보강 / 표본 "+MIN_SAMPLE+"명 미만이면 표본 부족"]);
+    { const AL=axisLabels(); sum.push(["※ 판정 기준: "+AL.taste+" "+TASTE_MIN+" 이상 그리고 "+AL.sensory+" "+SENSORY_MIN+" 이상이면 다음 단계 진행 / 하나라도 미달이면 해당 항목 보강 / 둘 다 미달이면 맛·관능 보강 / 표본 "+MIN_SAMPLE+"명 미만이면 표본 부족"]); }
   }else{
     sum.push(["문항별 1순위"]);
     sum.push(["문항","1순위","득표","응답 수","지지율(%)","비고"]);
@@ -753,7 +769,7 @@ function openReport(){
   if(!ROWS.length){alert("응답이 없습니다.");return;}
   const slug=viewSlug||CFG.slug||"설문";const evA=evAll();
   const names=[...new Set(evA.map(e=>e.name))];
-  const rank=names.map(nm=>{const pe=evA.filter(e=>e.name===nm);return{name:pe[0].name,brand:pe[0].brand,taste:avg(pe.map(x=>x.s.taste||0)),sensory:avg(pe.map(x=>otherAxisAvg(x.s))),n:pe.length};}).sort((a,b)=>(b.taste+b.sensory)-(a.taste+a.sensory));
+  const rank=names.map(nm=>{const pe=evA.filter(e=>e.name===nm);return{name:pe[0].name,brand:pe[0].brand,taste:avg(pe.map(x=>tasteAvgOf(x.s))),sensory:avg(pe.map(x=>otherAxisAvg(x.s))),n:pe.length};}).sort((a,b)=>(b.taste+b.sensory)-(a.taste+a.sensory));
   const sigTxt=(taste,sensory,n)=>{const v=verdictOf(taste,sensory,n);return v.icon+" "+v.text;};
   const segCounts={};ROWS.forEach(r=>{const k=`${r.age||'-'} ${r.gender||'-'}`;segCounts[k]=(segCounts[k]||0)+1;});
   const tblocks=CFG.blocks.filter(b=>(b.type==="price"||b.type==="choice"||b.type==="imgchoice"||(b.type==="module"&&b.opts&&b.opts.length)));
@@ -777,7 +793,7 @@ function openReport(){
   if(HASP){ html+=`<h2>제품 랭킹 · 출시 판정</h2>
   <table><tr><th class="l">제품</th><th>브랜드</th><th>맛</th><th>관능</th><th>표본</th><th>판정</th></tr>
   ${rank.map(x=>`<tr><td class="l">${esc(x.name)}</td><td>${esc(x.brand||"")}</td><td>${f1(x.taste)}</td><td>${f1(x.sensory)}</td><td>${x.n}</td><td>${sigTxt(x.taste,x.sensory,x.n)}</td></tr>`).join("")}</table>`;
-    html+=`<p style="font-size:11px;color:#6f6b64;margin:-2px 0 8px">※ 맛 ${TASTE_MIN} 이상 그리고 관능(그 외 4축 평균) ${SENSORY_MIN} 이상이면 다음 단계 진행 판정입니다. 표본 ${MIN_SAMPLE}명 미만은 표본 부족으로 표시됩니다.</p>`; }
+    { const AL=axisLabels(); html+=`<p style="font-size:11px;color:#6f6b64;margin:-2px 0 8px">※ ${AL.taste} ${TASTE_MIN} 이상 그리고 ${AL.sensory} ${SENSORY_MIN} 이상이면 다음 단계 진행 판정입니다. 표본 ${MIN_SAMPLE}명 미만은 표본 부족으로 표시됩니다.</p>`; } }
   if(tblocks.length){html+=`<h2>선택 · 투표 집계</h2>`;tblocks.forEach(b=>{const opts=(b.opts||[]).map(o=>b.type==="imgchoice"?o.label:o);const counts=opts.map(o=>ROWS.filter(r=>(r.extras||{})[b.q]===o).length);const tot=counts.reduce((a,c)=>a+c,0)||1;html+=`<div style="margin-bottom:8px"><b style="font-size:12.5px">${esc(b.label)}</b><table style="margin-top:3px"><tr>${opts.map(o=>`<th>${esc(o)}</th>`).join("")}</tr><tr>${counts.map(c=>`<td>${c}표 (${Math.round(c/tot*100)}%)</td>`).join("")}</tr></table></div>`;});}
   if(ASKP) html+=`<h2>응답자 구성</h2><table><tr>${Object.keys(segCounts).map(k=>`<th>${esc(k)}</th>`).join("")}</tr><tr>${Object.values(segCounts).map(v=>`<td>${v}명</td>`).join("")}</tr></table>`;
   if(ops.length){html+=`<h2>종합 의견 (${ops.length}건)</h2>`+ops.slice(0,40).map(o=>`<div class="op">${esc(o.t)}<div class="m">${esc(o.meta)}</div></div>`).join("");}
