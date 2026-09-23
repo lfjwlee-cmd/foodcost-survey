@@ -63,9 +63,11 @@
   .sbtn{border:1px solid var(--line-strong);background:var(--field);color:var(--muted);border-radius:10px;padding:11px 0;font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:600;cursor:pointer;transition:all .12s;text-align:center}
   .sbtn:hover{border-color:var(--accent)}.sbtn.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);transform:translateY(-1px)}
   .scale-ends{display:flex;justify-content:space-between;font-size:10.5px;color:var(--faint);margin-top:5px;font-family:"IBM Plex Mono",monospace}
-  .choices{display:flex;flex-direction:column;gap:8px}.choices.row{flex-direction:row}
-  .cbtn{flex:1;border:1px solid var(--line-strong);background:var(--field);color:var(--ink);border-radius:11px;padding:13px 14px;font-size:14px;cursor:pointer;font-family:inherit;text-align:left;transition:all .12s;display:flex;align-items:center;gap:9px}
-  .choices.row .cbtn{justify-content:center;text-align:center}.cbtn:hover{border-color:var(--accent)}.cbtn.on{border-color:var(--accent);background:var(--accent-soft);font-weight:600}
+  .choices{display:flex;flex-direction:column;gap:8px}.choices.row{flex-direction:row;flex-wrap:wrap}
+  .cbtn{flex:1;border:1px solid var(--line-strong);background:var(--field);color:var(--ink);border-radius:11px;padding:13px 14px;font-size:14px;cursor:pointer;font-family:inherit;text-align:left;transition:all .12s;display:flex;align-items:center;gap:9px;word-break:keep-all}
+  /* row형은 옵션이 몇 개든(예: 8개) 한 줄에 욱여넣지 않고, 버튼마다 최소 너비를 보장한 채 다음 줄로 감싼다 —
+     옵션이 적으면(2~4개) 지금까지처럼 한 줄, 많으면(6개 이상) 자연스럽게 여러 줄로 나뉜다 */
+  .choices.row .cbtn{justify-content:center;text-align:center;flex:1 1 auto;min-width:84px}.cbtn:hover{border-color:var(--accent)}.cbtn.on{border-color:var(--accent);background:var(--accent-soft);font-weight:600}
   .cbtn .rd{width:16px;height:16px;border-radius:50%;border:2px solid var(--line-strong);flex-shrink:0}.cbtn.on .rd{border-color:var(--accent);background:radial-gradient(circle,var(--accent) 42%,transparent 46%)}
   textarea{width:100%;border:1px solid var(--line-strong);background:var(--field);border-radius:11px;padding:12px 13px;font-family:inherit;font-size:14px;color:var(--ink);resize:vertical;min-height:74px}textarea:focus{outline:none;border-color:var(--accent)}
   .optional-mod{border:1px solid var(--line);border-left:3px solid var(--good);border-radius:10px;background:var(--surface-2);padding:12px 14px}
