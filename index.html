@@ -150,6 +150,7 @@
   .fld input:focus,.fld textarea:focus{outline:none;border-color:var(--accent)}
   .erow{display:grid;gap:6px;align-items:center;margin-bottom:7px}
   .erow input,.erow select{border:1px solid var(--line-strong);background:var(--field);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:13px;color:var(--ink);min-width:0}
+  .erow input:disabled{opacity:.55;cursor:not-allowed}
   .erow .del{border:1px solid var(--line-strong);background:var(--surface-2);color:var(--bad);border-radius:8px;cursor:pointer;font-size:16px;line-height:1;padding:0}
   input.acolor{padding:3px!important;height:36px;cursor:pointer}
   .addbtn{border:1px dashed var(--line-strong);background:none;color:var(--muted);border-radius:8px;padding:8px 12px;font-size:12.5px;cursor:pointer;font-family:inherit;margin-top:4px}
@@ -236,6 +237,13 @@
 <script>
 "use strict";
 let CFG=null,AXES=[],sb=null;
+/* 결과 화면에서 활성 회차가 아닌 회차를 볼 때, 그 회차 자신의 설정(축·문항)으로 그리기 위한 설정 */
+let VIEWCFG=null;
+function withViewCfg(fn){
+  if(!VIEWCFG) return fn();
+  const c=CFG,a=AXES; CFG=VIEWCFG; AXES=VIEWCFG.axes||[];
+  try{ return fn(); } finally { CFG=c; AXES=a; }
+}
 const CONF=window.SURVEY_CONFIG||{};
 function nocacheFetch(u,o){ return fetch(u,Object.assign({},o||{},{cache:"no-store"})); }
 // 이 설문 앱은 '익명(anon)'으로만 접속해야 함. 같은 Supabase 프로젝트를 쓰는 다른 앱(FoodCost 원가앱)에
@@ -311,7 +319,7 @@ function buildFormHtml(cfg,opt){
   const bcol=n=>{const b=(m.brands||[]).find(x=>x.name===n);return b?b.color:"var(--accent)";};
   let h=`<div class="hero"><div class="brands">${(m.brands||[]).map(b=>`<span class="bpill" style="background:${esc(b.color)}">${esc(b.name)}</span>`).join("")}</div>
     <h1>${esc(m.title||'')}</h1><p>${esc(m.intro||'')}</p><div class="meta-line"><span class="req">*</span> 표시는 꼭 응답해야 제출됩니다</div></div>`;
-  if(m.showRubric!==false && cfg.rubric&&cfg.rubric.length) h+=`<details class="rubric"><summary>📖 점수 기준 보기</summary><div class="rb-body">${cfg.rubric.map(r=>`<div class="rb-row"><span class="rb-n ${r.cls||''}">${esc(r.n)}</span><span>${esc(r.text)}</span></div>`).join("")}<p class="rb-note">※ 다섯 축 모두 같은 기준입니다.</p></div></details>`;
+  if(m.showRubric!==false && cfg.rubric&&cfg.rubric.length) h+=`<details class="rubric"><summary>📖 점수 기준 보기</summary><div class="rb-body">${cfg.rubric.map(r=>`<div class="rb-row"><span class="rb-n ${r.cls||''}">${esc(r.n)}</span><span>${esc(r.text)}</span></div>`).join("")}<p class="rb-note">※ 모든 평가 항목이 같은 기준입니다.</p></div></details>`;
   h+=`<form id="form">`;
   if(ASK) h+=`<section class="q"><div class="q-num">Q1 · 응답자 정보</div>
     <div class="qlabel">성별 <span class="req">*</span></div><div class="choices row" data-seg="gender">${(SEG.gender||[]).map(v=>`<button type="button" class="cbtn" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div>
@@ -447,7 +455,13 @@ async function loadDash(){
   const slug=viewSlug||CFG.slug||"default";
   const {data,error}=await sb.from("svy_responses").select("*").eq("survey_slug",slug).order("created_at",{ascending:true});
   if(error){$("dbody").innerHTML=`<div class="empty">불러오기 실패: ${esc(error.message)}</div>`;return;}
-  ROWS=data||[];renderDash();
+  let vc=null;
+  if(slug!==CFG.slug){ // 활성 회차가 아니면 그 회차 자신의 설정을 가져와 그 설정으로 그린다
+    try{ const {data:sv}=await sb.from("svy_surveys").select("config").eq("slug",slug).maybeSingle();
+      if(sv&&sv.config) vc=Object.assign({segments:CFG.segments,axes:CFG.axes,blocks:[],meta:{}},sv.config); }catch(e){}
+  }
+  if(slug!==(viewSlug||CFG.slug||"default")) return; // 그 사이 다른 회차로 바꿨다면, 늦게 도착한 이전 회차 응답·설정은 통째로 버린다
+  VIEWCFG=vc; ROWS=data||[]; renderDash(); // 설정과 응답은 항상 같은 회차 것끼리 함께 반영
 }
 const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
 const f1=v=>v.toFixed(1);
@@ -469,7 +483,8 @@ function buildFilters(){
       if(key==="brand"&&v!=="전체"){const d=document.createElement("span");d.className="brand-dot";d.style.background=brandColor(v);b.prepend(d);}
       b.onclick=()=>{dstate[key]=v;renderDash();};box.appendChild(b);});});
 }
-function renderDash(){
+function renderDash(){ return withViewCfg(_renderDash); }
+function _renderDash(){
   buildFilters();
   $("dsub").textContent=`${viewSlug||CFG.slug} · 총 ${ROWS.length}명 응답`;
   if(!ROWS.length){$("dbody").innerHTML=`<div class="empty">아직 응답이 없습니다.<br>「📝 응답하기」에서 첫 응답을 넣거나 QR을 공유하세요.</div>`;return;}
@@ -480,8 +495,8 @@ function renderDash(){
     dh+=`<section class="card block"><h2 style="margin-bottom:12px">제품 상세</h2><div class="prod-picker" id="prodPicker"></div>
       <div class="grid g2"><div><p class="cap" style="margin-bottom:2px">관능 프로필</p><div class="radar-wrap"><svg id="radar" width="300" height="240" viewBox="0 0 300 240"></svg></div><div class="radar-legend" id="radarLegend"></div></div>
       <div id="votes"></div></div></section>
-      <div class="grid g2 block"><div class="card"><h2>🚦 제품 랭킹 · 출시 판정</h2><p class="cap" id="rankCap">관능 5축 평균 기준</p><div style="overflow-x:auto"><table id="rankTable"></table></div></div>
-      <div class="card"><h2>🔥 세그먼트 × 맛 히트맵</h2><p class="cap">연령대별 5축 평균</p><div class="heat" id="heat"></div></div></div>
+      <div class="grid g2 block"><div class="card"><h2>🚦 제품 랭킹 · 출시 판정</h2><p class="cap" id="rankCap">맛·관능 기준</p><div style="overflow-x:auto"><table id="rankTable"></table></div></div>
+      <div class="card"><h2>🔥 세그먼트 × 맛 히트맵</h2><p class="cap">연령대별 ${AXES.length}축 평균</p><div class="heat" id="heat"></div></div></div>
       <div class="grid g2 block"><div class="card"><h2>💬 종합 의견</h2><p class="cap">자유 서술</p><div id="opinions"></div></div>
       <div class="card"><h2>🗳️ 선택·투표 집계</h2><p class="cap">가격·선호·모듈</p><div id="tally"></div></div></div>`;
   }else{
@@ -663,7 +678,8 @@ function addSheet(wb,name,aoa,widths){
   ws["!cols"]=(widths||[]).map(w=>({wch:w}));
   XLSX.utils.book_append_sheet(wb,ws,name);
 }
-function exportXlsx(){
+function exportXlsx(){ return withViewCfg(_exportXlsx); }
+function _exportXlsx(){
   if(!ROWS.length){alert("응답이 없습니다.");return;}
   if(!window.XLSX){alert("엑셀 모듈을 불러오지 못했습니다(네트워크 확인). CSV로 저장합니다.");exportCsv();return;}
   const slug=viewSlug||CFG.slug||"설문";
@@ -750,7 +766,8 @@ function exportXlsx(){
 
   XLSX.writeFile(wb,slug+"_결과.xlsx");
 }
-function exportCsv(){
+function exportCsv(){ return withViewCfg(_exportCsv); }
+function _exportCsv(){
   if(!ROWS.length)return;
   const prodBlocks=CFG.blocks.filter(b=>b.type==="product");const qCols=CFG.blocks.filter(b=>b.q);
   const cell=v=>{v=String(v??"");v=v.split('"').join('""');
@@ -765,7 +782,8 @@ function exportCsv(){
     lines.push(row.map(cell).join(","));});
   const blob=new Blob(["﻿"+lines.join("\n")],{type:"text/csv;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`${viewSlug||CFG.slug||"설문"}_결과.csv`;a.click();
 }
-function openReport(){
+function openReport(){ return withViewCfg(_openReport); }
+function _openReport(){
   if(!ROWS.length){alert("응답이 없습니다.");return;}
   const slug=viewSlug||CFG.slug||"설문";const evA=evAll();
   const names=[...new Set(evA.map(e=>e.name))];
@@ -818,7 +836,7 @@ function renderAdmin(){
   if(!sb){ body.innerHTML='<div class="empty">서버(Supabase) 연결이 필요합니다.</div>'; return; }
   let h=`<h1>⚙️ 설문 관리</h1><p style="color:var(--muted);font-size:13px;margin:0 0 16px"><b>저장 &amp; 활성화</b>하면 응답 폼에 바로 반영됩니다. 지난 회차·응답은 그대로 보관됩니다.</p>`;
   h+=`<div class="acard"><h3>설문 회차 <span style="float:right;display:flex;gap:6px"><button class="abtn primary" id="btnNew">+ 새 시식</button><button class="abtn" id="btnNewVote">+ 새 투표</button></span></h3>
-    <p style="font-size:11.5px;color:var(--faint);margin:-4px 0 10px"><b>시식</b> = 제품 관능 5축 평가 · <b>투표</b> = 제품 없이 선택 문항만(사내 업무 투표 등)</p><div id="surveyList"></div></div>`;
+    <p style="font-size:11.5px;color:var(--faint);margin:-4px 0 10px"><b>시식</b> = 제품 관능 평가 · <b>투표</b> = 제품 없이 선택 문항만(사내 업무 투표 등)</p><div id="surveyList"></div></div>`;
   h+=`<div class="acard"><h3>브랜드 관리 <span style="font-weight:400;color:var(--faint);font-size:11.5px">— 시식 설문 전용</span> <button class="abtn primary" id="btnAddBrand" style="float:right">+ 브랜드 등록</button></h3><p style="font-size:11.5px;color:var(--faint);margin:-4px 0 10px">시식 설문의 <b>제품</b>에 붙는 이름표입니다. 투표 설문에는 쓰이지 않습니다.</p><div id="brandList"></div></div>`;
   h+=`<div class="acard"><h3>📱 응답 QR</h3><div id="qrArea"></div></div>`;
   h+=`<div id="editorArea"></div>`;
@@ -903,9 +921,10 @@ function startNew(kind){
   draft=JSON.parse(JSON.stringify(base)); draft.slug=suggestSlug(kind); draftIsNew=true; buildEditModel(); renderAdmin();
   setTimeout(()=>{const e=$("editorArea");if(e)e.scrollIntoView({behavior:"smooth"});},60);
 }
-function editSurvey(slug){
+async function editSurvey(slug){
   const s=SURVEYS.find(x=>x.slug===slug); if(!s)return;
-  draft=JSON.parse(JSON.stringify(s.config)); draft.slug=s.slug; draftIsNew=false; buildEditModel(); renderAdmin();
+  const respN=await fetchRespCount(slug); // 이름 잠금 판단용 — 정확한 응답 수(못 구하면 null → 안전하게 잠금)
+  draft=JSON.parse(JSON.stringify(s.config)); draft.slug=s.slug; draftIsNew=false; buildEditModel(); ed.respN=respN; renderAdmin();
   setTimeout(()=>{const e=$("editorArea");if(e)e.scrollIntoView({behavior:"smooth"});},60);
 }
 async function activateSurvey(slug){
@@ -913,6 +932,41 @@ async function activateSurvey(slug){
   try{ await sb.from("svy_surveys").update({is_open:false}).neq("slug",slug); await sb.from("svy_surveys").update({is_open:true}).eq("slug",slug); }
   catch(e){ alert("활성화 실패: "+e.message); return; }
   await loadSurveys(); renderAdmin(); loadActiveSurvey();
+}
+/* 평가 항목의 표준 이름(기본값으로 되돌리기용) — key 기준. 이름이 바뀌어도 key·그룹·점수 저장 방식은 그대로다 */
+const STD_AXIS_DEFAULTS={
+  taste:{label:"맛",hint:"전반적인 맛"},aroma:{label:"향·풍미",hint:"냄새·맛의 깊이"},look:{label:"모양새",hint:"색·플레이팅"},
+  texture:{label:"식감",hint:"씹는 느낌"},portion:{label:"제공량",hint:"가격 대비 양"},
+  taste_first:{label:"첫맛",hint:"처음 느껴지는 맛"},taste_after:{label:"뒷맛",hint:"다 먹은 후 여운"},seasoning:{label:"간의 적절성",hint:"짜다/싱겁다 정도"},
+  color:{label:"색감",hint:"색·비주얼"},plating:{label:"플레이팅",hint:"담음새"}
+};
+const AXIS_LABEL_MAX=8, AXIS_HINT_MAX=24;
+/* 응답이 이미 있는 회차는 항목 이름을 못 바꾸게 잠근다(앞선 응답과 의미가 섞이므로). 응답 수를 못 확인하면 안전하게 잠근다 */
+function axisLockInfo(){
+  if(!ed) return {locked:false,n:0,unknown:false};
+  if(ed.respN===null) return {locked:true,n:0,unknown:true};
+  const n=Math.max(ed.respN||0,RESP_COUNTS[ed.slug]||0);
+  return {locked:n>0,n,unknown:false};
+}
+async function fetchRespCount(slug){
+  if(!sb) return null;
+  try{ const {count,error}=await sb.from("svy_responses").select("id",{count:"exact",head:true}).eq("survey_slug",slug);
+    if(error||typeof count!=="number") return null; return count; }catch(e){ return null; }
+}
+function axesChanged(){ return (ed.axes||[]).some(a=>(a.label||"").trim()!==a.defLabel||(a.hint||"").trim()!==a.defHint); }
+function updateAxisNote(){ const el=$("axDiff"); if(!el||!ed)return; el.textContent=axesChanged()?"※ 기본 이름과 다른 항목이 있습니다":"기본 이름 그대로"; }
+function renderAxisRows(){
+  const wrap=$("ed_axes_wrap"); if(!wrap||!ed) return;
+  if(!ed.products.length||!(ed.axes&&ed.axes.length)){ wrap.style.display="none"; wrap.innerHTML=""; return; }
+  wrap.style.display="";
+  const L=axisLockInfo();
+  let h=`<label>평가 항목 이름 <span style="color:var(--faint)">(항목 수·묶음은 고정 — 이름과 설명만 바꿀 수 있어요 · 이름은 ${AXIS_LABEL_MAX}자 이내)</span></label>`;
+  if(L.locked) h+=`<p style="font-size:12px;color:var(--bad);margin:2px 0 8px">${L.unknown?"🔒 응답 수를 확인하지 못해 안전을 위해 잠겨 있어요. 새로고침한 뒤 다시 열어 주세요.":`🔒 이미 ${L.n}명이 응답한 회차라 항목 이름을 바꿀 수 없어요. 이름을 바꾸면 앞선 응답과 의미가 섞이기 때문이에요. 다른 이름이 필요하면 새 회차를 만들어 주세요.`}</p>`;
+  h+=ed.axes.map((a,i)=>`<div class="erow" style="grid-template-columns:46px 1fr 1.4fr;margin-bottom:6px"><span class="type-badge" style="text-align:center;margin:0">${a.group==="taste"?"맛":"관능"}</span><input data-ax="${i}" data-k="label" maxlength="${AXIS_LABEL_MAX}" value="${esc(a.label)}" placeholder="${esc(a.defLabel)}" ${L.locked?"disabled":""}><input data-ax="${i}" data-k="hint" maxlength="${AXIS_HINT_MAX}" value="${esc(a.hint)}" placeholder="${esc(a.defHint)}" ${L.locked?"disabled":""}></div>`).join("");
+  h+=`<div style="display:flex;gap:10px;align-items:center;margin-top:4px;flex-wrap:wrap"><button type="button" class="abtn" id="axReset" ${L.locked?"disabled":""}>기본값으로 되돌리기</button><span id="axDiff" style="font-size:11.5px;color:var(--faint)"></span></div>`;
+  wrap.innerHTML=h; updateAxisNote();
+  wrap.oninput=e=>{ const t=e.target; if(!t||t.dataset.ax==null||L.locked) return; ed.axes[+t.dataset.ax][t.dataset.k]=t.value; updateAxisNote(); };
+  const rb=$("axReset"); if(rb) rb.onclick=()=>{ if(axisLockInfo().locked) return; ed.axes.forEach(a=>{a.label=a.defLabel;a.hint=a.defHint;}); renderAxisRows(); schedulePreview(); };
 }
 function buildEditModel(){
   const products=draft.blocks.filter(b=>b.type==="product").map(b=>({brand:b.brand,name:b.name,tag:b.tag||""}));
@@ -922,7 +976,9 @@ function buildEditModel(){
     else o.opts=(b.opts||[]).join("\n");
     return o;
   });
-  ed={slug:draft.slug,title:(draft.meta&&draft.meta.title)||"",intro:(draft.meta&&draft.meta.intro)||"",showRubric:!(draft.meta&&draft.meta.showRubric===false),askProfile:!(draft.meta&&draft.meta.askProfile===false),brands:((draft.meta&&draft.meta.brands)||[]).map(b=>({name:b.name,color:b.color||"#c1553a"})),products,extras};
+  const axes=(draft.axes||[]).map(a=>{const d=STD_AXIS_DEFAULTS[a.key]||{label:a.label||"",hint:a.hint||""};
+    return {key:a.key,group:axisGroup(a),label:a.label||"",hint:a.hint||"",defLabel:d.label,defHint:d.hint};});
+  ed={slug:draft.slug,axes,respN:0,title:(draft.meta&&draft.meta.title)||"",intro:(draft.meta&&draft.meta.intro)||"",showRubric:!(draft.meta&&draft.meta.showRubric===false),askProfile:!(draft.meta&&draft.meta.askProfile===false),brands:((draft.meta&&draft.meta.brands)||[]).map(b=>({name:b.name,color:b.color||"#c1553a"})),products,extras};
 }
 function renderEditor(){
   const el=$("editorArea");
@@ -934,7 +990,8 @@ function renderEditor(){
   h+=`<div class="fld"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="ed_rubric" ${ed.showRubric?'checked':''} style="width:auto;margin:0"> 점수 기준 보기 표시 <span style="color:var(--faint);font-weight:400;font-size:11px">(껐다 켰다 가능 · 응답 폼 상단 안내)</span></label></div>`;
   h+=`<div class="fld"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="ed_ask" ${ed.askProfile?"checked":""} style="width:auto;margin:0"> 응답자 정보(성별·연령) 받기 <span style="color:var(--faint);font-weight:400;font-size:11px">(끄면 완전 익명 — 사내 투표처럼 소수가 응답할 때 권장)</span></label></div>`;
   if(ed.products.length) h+=`<p style="font-size:11.5px;color:var(--faint);margin:0 0 12px">브랜드는 위 <b>브랜드 관리</b>에서 등록하면 아래 제품의 브랜드 목록에 자동으로 나타납니다.</p>`;
-  h+=`<div class="fld"><label>제품 <span style="color:var(--faint)">${ed.products.length?"(제품마다 관능 5축이 자동으로 붙습니다)":"(비어 있음 = <b>투표 설문</b>. 제품을 추가하면 관능 5축이 붙는 시식 설문이 됩니다)"}</span></label><div id="ed_products"></div><button class="addbtn" id="addProduct">+ 제품</button></div>`;
+  h+=`<div class="fld"><label>제품 <span style="color:var(--faint)">${ed.products.length?"(제품마다 평가 항목이 자동으로 붙습니다)":"(비어 있음 = <b>투표 설문</b>. 제품을 추가하면 평가 항목이 붙는 시식 설문이 됩니다)"}</span></label><div id="ed_products"></div><button class="addbtn" id="addProduct">+ 제품</button></div>`;
+  h+=`<div class="fld" id="ed_axes_wrap"></div>`;
   h+=`<div class="fld"><label>문항 <span style="color:var(--faint)">(선택 투표 · 사진 투표 · 자유 의견)</span></label><div id="ed_extras"></div><button class="addbtn" id="addExtra">+ 문항</button></div>`;
   h+=`<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="abtn primary" id="edSaveAct">저장 &amp; 응답 폼에 활성화</button><button class="abtn" id="edSave">저장만</button></div></div>`;
   el.innerHTML=h;
@@ -963,6 +1020,7 @@ function renderBrandRows(){
   el.querySelectorAll(".del").forEach(b=>b.onclick=()=>{ed.brands.splice(+b.dataset.i,1);renderBrandRows();renderProductRows();});
 }
 function renderProductRows(){
+  renderAxisRows(); // 제품 유무에 따라 평가 항목 이름란 표시/숨김
   const el=$("ed_products");const bopts=regBrandNames();
   if(ed.products.length&&!bopts.length){ el.innerHTML=`<div class="empty" style="padding:10px;font-size:12px">먼저 위 <b>브랜드 관리</b>에서 브랜드를 등록해 주세요. 제품에 붙일 이름표가 필요합니다.</div>`; return; }
   el.innerHTML=ed.products.map((p,i)=>`<div class="erow" style="grid-template-columns:1fr 1.2fr 1fr 38px"><select data-i="${i}">${bopts.map(n=>`<option ${n===p.brand?'selected':''}>${esc(n)}</option>`).join("")}</select><input value="${esc(p.name)}" data-i="${i}" data-k="name" placeholder="제품명"><input value="${esc(p.tag)}" data-i="${i}" data-k="tag" placeholder="태그(예: 칼국수·기본)"><button class="del" data-i="${i}">×</button></div>`).join("");
@@ -1031,11 +1089,23 @@ function buildDraftCfg(){
   cfg.meta.title=ed.title; cfg.meta.intro=ed.intro; cfg.meta.showRubric=ed.showRubric; cfg.meta.askProfile=ed.askProfile!==false;
   const usedBrands=[...new Set(blocks.filter(b=>b.type==="product").map(b=>b.brand))].filter(Boolean);
   cfg.meta.brands=usedBrands.map(n=>({name:n,color:regColor(n)}));
+  // 평가 항목 이름·설명 반영(key·그룹은 그대로). 응답이 있어 잠긴 회차는 원래 축을 그대로 둔다
+  if(ed.axes&&ed.axes.length&&Array.isArray(cfg.axes)&&!axisLockInfo().locked){
+    cfg.axes=cfg.axes.map((a,i)=>{const e=ed.axes[i]; if(!e||e.key!==a.key) return a;
+      return Object.assign({},a,{label:(e.label||"").trim()||e.defLabel,hint:(e.hint||"").trim()});});
+  }
   cfg.blocks=blocks; return cfg;
 }
 async function saveDraft(activate){
   if(!ed.slug){alert("회차 ID를 입력하세요");return;} if(!sb){alert("서버 연결이 필요합니다");return;}
   const cfg=buildDraftCfg();
+  if(ed.products.length&&Array.isArray(cfg.axes)){ // 평가 항목 이름 검증: 길이·중복
+    const ls=cfg.axes.map(a=>a.label);
+    const tooLong=ls.find(l=>Array.from(l).length>AXIS_LABEL_MAX);
+    if(tooLong){alert("평가 항목 이름은 "+AXIS_LABEL_MAX+"자 이내로 입력하세요: "+tooLong);return;}
+    const dup=ls.find((l,i)=>ls.indexOf(l)!==i);
+    if(dup){alert("평가 항목 이름이 겹칩니다: "+dup+" — 서로 다른 이름으로 바꿔 주세요.");return;}
+  }
   const up={slug:cfg.slug,title:cfg.meta.title||cfg.slug,config:cfg};
   if(activate){ try{ await sb.from("svy_surveys").update({is_open:false}).neq("slug",cfg.slug); }catch(e){} up.is_open=true; }
   else if(draftIsNew){ up.is_open=false; }
