@@ -824,7 +824,7 @@ function _openReport(){
 let SURVEYS=[],RESP_COUNTS={},draft=null,ed=null,draftIsNew=false,BRANDS_REG=[];
 async function openAdmin(){ await loadBrands(); await loadSurveys(); renderAdmin(); }
 async function loadBrands(){ BRANDS_REG=[]; if(!sb)return; try{ const {data}=await sb.from("svy_brands").select("*").order("sort",{ascending:true}); BRANDS_REG=data||[]; }catch(e){} }
-function regBrandNames(){ return [...new Set([...BRANDS_REG.map(b=>b.name), ...((ed&&ed.products)||[]).map(p=>p.brand)])].filter(Boolean); }
+function regBrandNames(){ return [...new Set([...BRANDS_REG.map(b=>b.name), ...edProds().map(p=>p.brand)])].filter(Boolean); }
 function regColor(n){ const r=BRANDS_REG.find(x=>x.name===n)||((ed&&ed.brands)||[]).find(x=>x.name===n); return (r&&r.color)||"#c1553a"; }
 async function loadSurveys(){
   SURVEYS=[];RESP_COUNTS={}; if(!sb)return;
@@ -957,7 +957,7 @@ function axesChanged(){ return (ed.axes||[]).some(a=>(a.label||"").trim()!==a.de
 function updateAxisNote(){ const el=$("axDiff"); if(!el||!ed)return; el.textContent=axesChanged()?"※ 기본 이름과 다른 항목이 있습니다":"기본 이름 그대로"; }
 function renderAxisRows(){
   const wrap=$("ed_axes_wrap"); if(!wrap||!ed) return;
-  if(!ed.products.length||!(ed.axes&&ed.axes.length)){ wrap.style.display="none"; wrap.innerHTML=""; return; }
+  if(!edProds().length||!(ed.axes&&ed.axes.length)){ wrap.style.display="none"; wrap.innerHTML=""; return; }
   wrap.style.display="";
   const L=axisLockInfo();
   let h=`<label>평가 항목 이름 <span style="color:var(--faint)">(항목 수·묶음은 고정 — 이름과 설명만 바꿀 수 있어요 · 이름은 ${AXIS_LABEL_MAX}자 이내)</span></label>`;
@@ -968,31 +968,32 @@ function renderAxisRows(){
   wrap.oninput=e=>{ const t=e.target; if(!t||t.dataset.ax==null||L.locked) return; ed.axes[+t.dataset.ax][t.dataset.k]=t.value; updateAxisNote(); };
   const rb=$("axReset"); if(rb) rb.onclick=()=>{ if(axisLockInfo().locked) return; ed.axes.forEach(a=>{a.label=a.defLabel;a.hint=a.defHint;}); renderAxisRows(); schedulePreview(); };
 }
+/* 편집기의 구성 목록: 제품(kind:"product")과 문항(kind:"extra")을 한 목록에 두고, 이 순서가 응답 폼의 순서가 된다 */
+function edProds(){ return (ed&&ed.items?ed.items:[]).filter(x=>x.kind==="product"); }
 function buildEditModel(){
-  const products=draft.blocks.filter(b=>b.type==="product").map(b=>({brand:b.brand,name:b.name,tag:b.tag||""}));
-  const extras=draft.blocks.filter(b=>b.type!=="product").map(b=>{
-    const o={type:b.type,q:b.q,label:b.label||"",opts:"",input:b.input||"",ph:b.ph||"",imgopts:[],req:b.req!==false};
+  const items=(draft.blocks||[]).map(b=>{
+    if(b.type==="product") return {kind:"product",brand:b.brand,name:b.name,tag:b.tag||""};
+    const o={kind:"extra",type:b.type,q:b.q,label:b.label||"",opts:"",input:b.input||"",ph:b.ph||"",imgopts:[],req:b.req!==false};
     if(b.type==="imgchoice") o.imgopts=(b.opts||[]).map(x=>({label:x.label||"",image:x.image||""}));
     else o.opts=(b.opts||[]).join("\n");
     return o;
   });
   const axes=(draft.axes||[]).map(a=>{const d=STD_AXIS_DEFAULTS[a.key]||{label:a.label||"",hint:a.hint||""};
     return {key:a.key,group:axisGroup(a),label:a.label||"",hint:a.hint||"",defLabel:d.label,defHint:d.hint};});
-  ed={slug:draft.slug,axes,respN:0,title:(draft.meta&&draft.meta.title)||"",intro:(draft.meta&&draft.meta.intro)||"",showRubric:!(draft.meta&&draft.meta.showRubric===false),askProfile:!(draft.meta&&draft.meta.askProfile===false),brands:((draft.meta&&draft.meta.brands)||[]).map(b=>({name:b.name,color:b.color||"#c1553a"})),products,extras};
+  ed={slug:draft.slug,axes,respN:0,title:(draft.meta&&draft.meta.title)||"",intro:(draft.meta&&draft.meta.intro)||"",showRubric:!(draft.meta&&draft.meta.showRubric===false),askProfile:!(draft.meta&&draft.meta.askProfile===false),brands:((draft.meta&&draft.meta.brands)||[]).map(b=>({name:b.name,color:b.color||"#c1553a"})),items};
 }
 function renderEditor(){
   const el=$("editorArea");
   let h=`<div class="acard"><h3>👁 미리보기 <span style="font-weight:400;color:var(--faint);font-size:11px">— 응답자에게 보이는 화면 (편집하면 실시간 반영)</span></h3><div class="prev-wrap"><div id="previewBody" class="prev-body"></div></div></div>`;
-  h+=`<div class="acard"><h3>${draftIsNew?(ed.products.length?"새 시식 만들기":"새 투표 설문 만들기"):("회차 편집 · "+(ed.products.length?"시식":"투표"))} <button class="abtn ghost" id="edCancel" style="float:right">닫기</button></h3>`;
+  h+=`<div class="acard"><h3>${draftIsNew?(edProds().length?"새 시식 만들기":"새 투표 설문 만들기"):("회차 편집 · "+(edProds().length?"시식":"투표"))} <button class="abtn ghost" id="edCancel" style="float:right">닫기</button></h3>`;
   h+=`<div class="fld"><label>회차 ID</label><input id="ed_slug" value="${esc(ed.slug)}" ${draftIsNew?'':'readonly style="opacity:.6"'}></div>`;
   h+=`<div class="fld"><label>제목</label><input id="ed_title" value="${esc(ed.title)}"></div>`;
   h+=`<div class="fld"><label>소개 문구</label><textarea id="ed_intro" rows="2">${esc(ed.intro)}</textarea></div>`;
   h+=`<div class="fld"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="ed_rubric" ${ed.showRubric?'checked':''} style="width:auto;margin:0"> 점수 기준 보기 표시 <span style="color:var(--faint);font-weight:400;font-size:11px">(껐다 켰다 가능 · 응답 폼 상단 안내)</span></label></div>`;
   h+=`<div class="fld"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="ed_ask" ${ed.askProfile?"checked":""} style="width:auto;margin:0"> 응답자 정보(성별·연령) 받기 <span style="color:var(--faint);font-weight:400;font-size:11px">(끄면 완전 익명 — 사내 투표처럼 소수가 응답할 때 권장)</span></label></div>`;
-  if(ed.products.length) h+=`<p style="font-size:11.5px;color:var(--faint);margin:0 0 12px">브랜드는 위 <b>브랜드 관리</b>에서 등록하면 아래 제품의 브랜드 목록에 자동으로 나타납니다.</p>`;
-  h+=`<div class="fld"><label>제품 <span style="color:var(--faint)">${ed.products.length?"(제품마다 평가 항목이 자동으로 붙습니다)":"(비어 있음 = <b>투표 설문</b>. 제품을 추가하면 평가 항목이 붙는 시식 설문이 됩니다)"}</span></label><div id="ed_products"></div><button class="addbtn" id="addProduct">+ 제품</button></div>`;
+  if(edProds().length) h+=`<p style="font-size:11.5px;color:var(--faint);margin:0 0 12px">브랜드는 위 <b>브랜드 관리</b>에서 등록하면 아래 제품의 브랜드 목록에 자동으로 나타납니다.</p>`;
+  h+=`<div class="fld"><label>구성 <span style="color:var(--faint)">(위에서 아래 순서대로 응답자에게 보여요 · ▲▼로 순서 변경 · 제품은 평가 항목이 자동으로 붙고, 제품이 하나도 없으면 <b>투표 설문</b>)</span></label><div id="ed_items"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="addbtn" id="addProduct">+ 제품</button><button class="addbtn" id="addExtra">+ 문항</button></div><p style="font-size:11.5px;color:var(--faint);margin:6px 0 0">문항 = 선택 투표 · 사진 투표 · 자유 의견. 제품 이름은 서로 달라야 합니다(같은 이름이면 점수가 섞여요).</p></div>`;
   h+=`<div class="fld" id="ed_axes_wrap"></div>`;
-  h+=`<div class="fld"><label>문항 <span style="color:var(--faint)">(선택 투표 · 사진 투표 · 자유 의견)</span></label><div id="ed_extras"></div><button class="addbtn" id="addExtra">+ 문항</button></div>`;
   h+=`<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="abtn primary" id="edSaveAct">저장 &amp; 응답 폼에 활성화</button><button class="abtn" id="edSave">저장만</button></div></div>`;
   el.innerHTML=h;
   $("ed_slug").oninput=e=>ed.slug=e.target.value.trim();
@@ -1000,9 +1001,9 @@ function renderEditor(){
   $("ed_intro").oninput=e=>ed.intro=e.target.value;
   $("ed_rubric").onchange=e=>{ed.showRubric=e.target.checked;};
   $("ed_ask").onchange=e=>{ed.askProfile=e.target.checked;};
-  renderProductRows();renderExtraRows();
-  $("addProduct").onclick=()=>{ed.products.push({brand:(BRANDS_REG[0]&&BRANDS_REG[0].name)||"",name:"새 제품",tag:""});renderProductRows();};
-  $("addExtra").onclick=()=>{ed.extras.push({type:"choice",q:"q"+Math.random().toString(36).slice(2,7),label:"새 문항",opts:"",input:"",ph:""});renderExtraRows();};
+  renderItemRows();
+  $("addProduct").onclick=()=>{ed.items.push({kind:"product",brand:(BRANDS_REG[0]&&BRANDS_REG[0].name)||"",name:"새 제품",tag:""});renderItemRows();};
+  $("addExtra").onclick=()=>{ed.items.push({kind:"extra",type:"choice",q:"q"+Math.random().toString(36).slice(2,7),label:"새 문항",opts:"",input:"",ph:""});renderItemRows();};
   $("edCancel").onclick=()=>{draft=null;ed=null;renderAdmin();};
   $("edSaveAct").onclick=()=>saveDraft(true);
   $("edSave").onclick=()=>saveDraft(false);
@@ -1019,48 +1020,62 @@ function renderBrandRows(){
   el.querySelectorAll("input").forEach(inp=>inp.oninput=e=>{ed.brands[+e.target.dataset.i][e.target.dataset.k]=e.target.value;});
   el.querySelectorAll(".del").forEach(b=>b.onclick=()=>{ed.brands.splice(+b.dataset.i,1);renderBrandRows();renderProductRows();});
 }
-function renderProductRows(){
-  renderAxisRows(); // 제품 유무에 따라 평가 항목 이름란 표시/숨김
-  const el=$("ed_products");const bopts=regBrandNames();
-  if(ed.products.length&&!bopts.length){ el.innerHTML=`<div class="empty" style="padding:10px;font-size:12px">먼저 위 <b>브랜드 관리</b>에서 브랜드를 등록해 주세요. 제품에 붙일 이름표가 필요합니다.</div>`; return; }
-  el.innerHTML=ed.products.map((p,i)=>`<div class="erow" style="grid-template-columns:1fr 1.2fr 1fr 38px"><select data-i="${i}">${bopts.map(n=>`<option ${n===p.brand?'selected':''}>${esc(n)}</option>`).join("")}</select><input value="${esc(p.name)}" data-i="${i}" data-k="name" placeholder="제품명"><input value="${esc(p.tag)}" data-i="${i}" data-k="tag" placeholder="태그(예: 칼국수·기본)"><button class="del" data-i="${i}">×</button></div>`).join("");
-  el.querySelectorAll("input").forEach(inp=>inp.oninput=e=>{ed.products[+e.target.dataset.i][e.target.dataset.k]=e.target.value;});
-  el.querySelectorAll("select").forEach(s=>s.onchange=e=>{ed.products[+e.target.dataset.i].brand=e.target.value;});
-  el.querySelectorAll(".del").forEach(b=>b.onclick=()=>{ed.products.splice(+b.dataset.i,1);renderProductRows();});
+function moveItem(i,d){
+  const j=i+d; if(!ed||j<0||j>=ed.items.length) return;
+  const t=ed.items[i]; ed.items[i]=ed.items[j]; ed.items[j]=t;
+  renderItemRows();
+  const el=$("ed_items"); const b=el&&(el.querySelector(`[data-mv="${j}"][data-d="${d}"]:not([disabled])`)||el.querySelector(`[data-mv="${j}"]:not([disabled])`));
+  if(b) b.focus(); // 같은 항목을 계속 움직일 수 있게 포커스를 따라가게 한다
 }
-function renderExtraRows(){
-  const el=$("ed_extras");const types=[["choice","선택 투표 (버튼형)"],["price","선택 투표 (목록형)"],["imgchoice","사진 투표"],["text","자유 의견"],["module","추가 의견 (항상 선택)"]];
-  el.innerHTML=ed.extras.map((x,i)=>{const needOpts=(x.type==="price"||x.type==="choice"||(x.type==="module"&&x.input!=="text"));
-    let bl=`<div class="erow" style="grid-template-columns:1fr 1.6fr 38px"><select data-i="${i}" data-k="type">${types.map(t=>`<option value="${t[0]}" ${t[0]===x.type?'selected':''}>${t[1]}</option>`).join("")}</select><input value="${esc(x.label)}" data-i="${i}" data-k="label" placeholder="질문 문구"><button class="del" data-i="${i}">×</button></div>`;
-    if(x.type==="imgchoice") bl+=`<div style="margin-top:8px" id="imgopts_${i}"></div><button type="button" class="addbtn" data-addimg="${i}">+ 사진 항목</button>`;
-    else if(needOpts) bl+=`<div style="margin-top:6px"><textarea rows="3" style="width:100%;border:1px solid var(--line-strong);background:var(--field);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:13px;color:var(--ink);resize:vertical" data-i="${i}" data-k="opts" placeholder="선택지 — 한 줄에 하나씩:&#10;10,000원&#10;11,000원&#10;12,000원">${esc(x.opts)}</textarea></div>`;
-    if(x.type==="module") bl+=`<label style="font-size:11.5px;color:var(--muted);display:block;margin-top:7px"><input type="checkbox" data-i="${i}" data-k="modtext" ${x.input==="text"?"checked":""}> 자유입력(직접 추천)으로 받기</label>`;
-    if(x.type==="price"||x.type==="choice"||x.type==="imgchoice") bl+=`<label style="font-size:11.5px;color:var(--muted);display:block;margin-top:7px"><input type="checkbox" data-i="${i}" data-k="req" ${x.req!==false?"checked":""}> 필수 응답 <span style="color:var(--faint)">(끄면 건너뛸 수 있음)</span></label>`;
+function renderProductRows(){ renderItemRows(); } // 브랜드 등록·삭제 뒤에도 호출됨
+function renderItemRows(){
+  renderAxisRows(); // 제품 유무에 따라 평가 항목 이름란 표시/숨김
+  const el=$("ed_items"); if(!el||!ed) return;
+  const bopts=regBrandNames(), n=ed.items.length;
+  const types=[["choice","선택 투표 (버튼형)"],["price","선택 투표 (목록형)"],["imgchoice","사진 투표"],["text","자유 의견"],["module","추가 의견 (항상 선택)"]];
+  ed.items.forEach(x=>{ if(x.kind==="product"&&!x.brand&&bopts.length) x.brand=bopts[0]; });
+  const head=(i,label)=>`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:11.5px;color:var(--muted)"><b style="color:var(--accent)">${i+1}</b> · ${label}</span><span style="display:flex;gap:4px"><button type="button" class="abtn" data-mv="${i}" data-d="-1" title="위로" aria-label="위로" ${i===0?"disabled":""}>▲</button><button type="button" class="abtn" data-mv="${i}" data-d="1" title="아래로" aria-label="아래로" ${i===n-1?"disabled":""}>▼</button></span></div>`;
+  let h=(edProds().length&&!bopts.length)?`<div class="empty" style="padding:10px;font-size:12px">먼저 위 <b>브랜드 관리</b>에서 브랜드를 등록해 주세요. 제품에 붙일 이름표가 필요합니다.</div>`:"";
+  h+=ed.items.map((x,i)=>{
+    let bl;
+    if(x.kind==="product"){
+      bl=head(i,"제품 시식")+`<div class="erow" style="grid-template-columns:1fr 1.2fr 1fr 38px"><select data-i="${i}" data-k="brand">${bopts.map(b=>`<option ${b===x.brand?'selected':''}>${esc(b)}</option>`).join("")}</select><input value="${esc(x.name)}" data-i="${i}" data-k="name" placeholder="제품명"><input value="${esc(x.tag)}" data-i="${i}" data-k="tag" placeholder="태그(예: 칼국수·기본)"><button class="del" data-i="${i}">×</button></div>`;
+    }else{
+      const needOpts=(x.type==="price"||x.type==="choice"||(x.type==="module"&&x.input!=="text"));
+      bl=head(i,"문항")+`<div class="erow" style="grid-template-columns:1fr 1.6fr 38px"><select data-i="${i}" data-k="type">${types.map(t=>`<option value="${t[0]}" ${t[0]===x.type?'selected':''}>${t[1]}</option>`).join("")}</select><input value="${esc(x.label)}" data-i="${i}" data-k="label" placeholder="질문 문구"><button class="del" data-i="${i}">×</button></div>`;
+      if(x.type==="imgchoice") bl+=`<div style="margin-top:8px" id="imgopts_${i}"></div><button type="button" class="addbtn" data-addimg="${i}">+ 사진 항목</button>`;
+      else if(needOpts) bl+=`<div style="margin-top:6px"><textarea rows="3" style="width:100%;border:1px solid var(--line-strong);background:var(--field);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:13px;color:var(--ink);resize:vertical" data-i="${i}" data-k="opts" placeholder="선택지 — 한 줄에 하나씩:&#10;10,000원&#10;11,000원&#10;12,000원">${esc(x.opts)}</textarea></div>`;
+      if(x.type==="module") bl+=`<label style="font-size:11.5px;color:var(--muted);display:block;margin-top:7px"><input type="checkbox" style="width:auto;margin:0 4px 0 0;vertical-align:-2px" data-i="${i}" data-k="modtext" ${x.input==="text"?"checked":""}> 자유입력(직접 추천)으로 받기</label>`;
+      if(x.type==="price"||x.type==="choice"||x.type==="imgchoice") bl+=`<label style="font-size:11.5px;color:var(--muted);display:block;margin-top:7px"><input type="checkbox" style="width:auto;margin:0 4px 0 0;vertical-align:-2px" data-i="${i}" data-k="req" ${x.req!==false?"checked":""}> 필수 응답 <span style="color:var(--faint)">(끄면 건너뛸 수 있음)</span></label>`;
+    }
     return `<div style="border:1px solid var(--line);border-radius:9px;padding:10px;margin-bottom:8px">${bl}</div>`;}).join("");
+  el.innerHTML=h;
   el.querySelectorAll("[data-k]").forEach(inp=>{if(inp.dataset.k==="imglabel")return;const ev=(inp.tagName==="SELECT"||inp.type==="checkbox")?"onchange":"oninput";
-    inp[ev]=e=>{const i=+e.target.dataset.i,k=e.target.dataset.k;
-      if(k==="modtext"){ed.extras[i].input=e.target.checked?"text":"";renderExtraRows();}
-      else if(k==="type"){ed.extras[i].type=e.target.value;if(e.target.value==="imgchoice"&&!ed.extras[i].imgopts)ed.extras[i].imgopts=[];renderExtraRows();}
-      else if(k==="req"){ed.extras[i].req=e.target.checked;}
-      else ed.extras[i][k]=e.target.value;};});
-  el.querySelectorAll("[data-addimg]").forEach(b=>b.onclick=()=>{const i=+b.dataset.addimg;(ed.extras[i].imgopts=ed.extras[i].imgopts||[]).push({label:"",image:""});renderImgOpts(i);});
-  el.querySelectorAll(".del").forEach(b=>b.onclick=()=>{ed.extras.splice(+b.dataset.i,1);renderExtraRows();});
-  ed.extras.forEach((x,i)=>{if(x.type==="imgchoice")renderImgOpts(i);});
+    inp[ev]=e=>{const x=ed.items[+e.target.dataset.i],k=e.target.dataset.k; if(!x)return;
+      if(k==="modtext"){x.input=e.target.checked?"text":"";renderItemRows();}
+      else if(k==="type"){x.type=e.target.value;if(e.target.value==="imgchoice"&&!x.imgopts)x.imgopts=[];renderItemRows();}
+      else if(k==="req"){x.req=e.target.checked;}
+      else x[k]=e.target.value;};});
+  el.querySelectorAll("[data-mv]").forEach(b=>b.onclick=()=>moveItem(+b.dataset.mv,+b.dataset.d));
+  el.querySelectorAll("[data-addimg]").forEach(b=>b.onclick=()=>{const x=ed.items[+b.dataset.addimg];(x.imgopts=x.imgopts||[]).push({label:"",image:""});renderImgOpts(+b.dataset.addimg);});
+  el.querySelectorAll(".del").forEach(b=>b.onclick=()=>{ed.items.splice(+b.dataset.i,1);renderItemRows();});
+  ed.items.forEach((x,i)=>{if(x.kind==="extra"&&x.type==="imgchoice")renderImgOpts(i);});
+  schedulePreview();
 }
 function renderImgOpts(i){
   const el=$("imgopts_"+i); if(!el)return;
-  const list=ed.extras[i].imgopts||(ed.extras[i].imgopts=[]);
+  const list=ed.items[i].imgopts||(ed.items[i].imgopts=[]);
   el.innerHTML=list.length?list.map((o,j)=>`<div class="erow" style="grid-template-columns:54px 1fr 60px 34px;align-items:center;margin-bottom:6px">
     <div style="width:50px;height:50px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2) ${o.image?`url('${esc(o.image)}')`:''} center/cover no-repeat"></div>
     <input value="${esc(o.label)}" data-i="${i}" data-j="${j}" data-k="imglabel" placeholder="항목명 (예: 금색)">
     <button type="button" class="abtn" data-up="${i}_${j}">사진</button><button type="button" class="del" data-delimg="${i}_${j}">×</button></div>`).join(""):`<p style="font-size:11.5px;color:var(--faint);margin:0 0 4px">아래 버튼으로 사진 항목을 추가하세요.</p>`;
-  el.querySelectorAll("input[data-k=imglabel]").forEach(inp=>inp.oninput=e=>{ed.extras[+e.target.dataset.i].imgopts[+e.target.dataset.j].label=e.target.value;});
+  el.querySelectorAll("input[data-k=imglabel]").forEach(inp=>inp.oninput=e=>{ed.items[+e.target.dataset.i].imgopts[+e.target.dataset.j].label=e.target.value;});
   el.querySelectorAll("[data-up]").forEach(b=>b.onclick=()=>pickPhoto(b.dataset.up));
-  el.querySelectorAll("[data-delimg]").forEach(b=>b.onclick=()=>{const p=b.dataset.delimg.split("_").map(Number);ed.extras[p[0]].imgopts.splice(p[1],1);renderImgOpts(p[0]);});
+  el.querySelectorAll("[data-delimg]").forEach(b=>b.onclick=()=>{const p=b.dataset.delimg.split("_").map(Number);ed.items[p[0]].imgopts.splice(p[1],1);renderImgOpts(p[0]);});
 }
 function pickPhoto(key){
   const p=key.split("_").map(Number);const inp=document.createElement("input");inp.type="file";inp.accept="image/*";
-  inp.onchange=async()=>{const f=inp.files&&inp.files[0];if(!f)return;const url=await uploadPhoto(f);if(url){ed.extras[p[0]].imgopts[p[1]].image=url;renderImgOpts(p[0]);}};
+  inp.onchange=async()=>{const f=inp.files&&inp.files[0];if(!f)return;const url=await uploadPhoto(f);if(url){ed.items[p[0]].imgopts[p[1]].image=url;renderImgOpts(p[0]);}};
   inp.click();
 }
 async function uploadPhoto(file){
@@ -1076,8 +1091,9 @@ async function uploadPhoto(file){
 }
 function buildDraftCfg(){
   const blocks=[];
-  ed.products.forEach(p=>{if(!p.name)return;blocks.push({type:"product",brand:p.brand,name:p.name,tag:p.tag,cat:(p.tag||"").split(/[·|]/)[0].trim()});});
-  ed.extras.forEach(x=>{const b={type:x.type,q:x.q||("q"+Math.random().toString(36).slice(2,7)),label:x.label};
+  ed.items.forEach(x=>{
+    if(x.kind==="product"){ if(!x.name)return; blocks.push({type:"product",brand:x.brand,name:x.name,tag:x.tag,cat:(x.tag||"").split(/[·|]/)[0].trim()}); return; }
+    const b={type:x.type,q:x.q||("q"+Math.random().toString(36).slice(2,7)),label:x.label};
     if((x.type==="price"||x.type==="choice"||x.type==="imgchoice")&&x.req===false) b.req=false;
     if(x.type==="price"){b.opts=(x.opts||"").split("\n").map(s=>s.trim()).filter(Boolean);}
     else if(x.type==="choice"){b.opts=(x.opts||"").split("\n").map(s=>s.trim()).filter(Boolean);b.row=true;}
@@ -1099,7 +1115,11 @@ function buildDraftCfg(){
 async function saveDraft(activate){
   if(!ed.slug){alert("회차 ID를 입력하세요");return;} if(!sb){alert("서버 연결이 필요합니다");return;}
   const cfg=buildDraftCfg();
-  if(ed.products.length&&Array.isArray(cfg.axes)){ // 평가 항목 이름 검증: 길이·중복
+  const pb=cfg.blocks.filter(b=>b.type==="product");
+  const pdup=pb.map(b=>(b.name||"").trim()).find((n,i,a)=>a.indexOf(n)!==i);
+  if(pdup){alert("제품 이름이 겹칩니다: "+pdup+" — 같은 이름이면 점수가 섞여요. 서로 다른 이름으로 바꿔 주세요.");return;}
+  if(pb.some(b=>!b.brand)){alert("브랜드가 없는 제품이 있습니다. 브랜드를 선택해 주세요.");return;}
+  if(pb.length&&Array.isArray(cfg.axes)){ // 평가 항목 이름 검증: 길이·중복
     const ls=cfg.axes.map(a=>a.label);
     const tooLong=ls.find(l=>Array.from(l).length>AXIS_LABEL_MAX);
     if(tooLong){alert("평가 항목 이름은 "+AXIS_LABEL_MAX+"자 이내로 입력하세요: "+tooLong);return;}
