@@ -74,6 +74,8 @@ questions.json      활성 회차가 하나도 없을 때 쓰는 샘플 회차(8
 qr.html             응답 주소 QR 생성기
 results.html        index.html 로 넘기는 옛 주소 호환용
 serve.js            로컬 미리보기 서버(127.0.0.1 전용, 폴더 바깥 접근 차단)
+tools/
+  report-to-pdf.mjs 결과 보고서를 실제 PDF 파일로 뽑아 쪽 나눔을 확인하는 검증용 스크립트(Chrome 필요)
 supabase/
   schema.sql        테이블·보안정책·권한 (처음 설치 시 1회)
   storage.sql       사진 투표용 저장소(선택)

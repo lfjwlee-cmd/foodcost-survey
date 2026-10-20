@@ -932,7 +932,7 @@ function _openReport(){
     if(sec!==last){last=sec;if(sec&&(sec.label||sec.text)){const sbs=secBrandsOf(sec);h+=`<div class="secbar"><b>${esc(sec.label||"")}</b>${sbs.length?` <span>[${esc(sbs.join("·"))}]</span>`:""}${sec.text?` <span>${esc(sec.text)}</span>`:""}</div>`;}}
     const opts=(b.opts||[]).map(o=>b.type==="imgchoice"?o.label:o);const counts=opts.map(o=>ROWS.filter(r=>(r.extras||{})[b.q]===o).length);const tot0=counts.reduce((a,c)=>a+c,0),tot=tot0||1;
     const showOwner=x.owners.length&&(mode==="all"||x.owners.length>1); // 브랜드 페이지에서는 두 브랜드 이상에 걸친 투표만 소속을 표시
-    h+=`<div style="margin-bottom:8px"><b style="font-size:12.5px">${esc(b.label)}</b>${showOwner?` <span style="color:#c1553a;font-size:11px">[${esc(x.owners.join("·"))}${x.owners.length>1?" 공통":""}]</span>`:""} <span style="color:#6f6b64;font-size:11px">· 응답 ${tot0}명 기준</span><table style="margin-top:3px"><tr>${opts.map(o=>`<th>${esc(o)}</th>`).join("")}</tr><tr>${counts.map(c=>`<td>${c}표 (${Math.round(c/tot*100)}%)</td>`).join("")}</tr></table></div>`;});return h;};
+    h+=`<div class="vq" style="margin-bottom:8px"><b style="font-size:12.5px">${esc(b.label)}</b>${showOwner?` <span style="color:#c1553a;font-size:11px">[${esc(x.owners.join("·"))}${x.owners.length>1?" 공통":""}]</span>`:""} <span style="color:#6f6b64;font-size:11px">· 응답 ${tot0}명 기준</span><table style="margin-top:3px"><tr>${opts.map(o=>`<th>${esc(o)}</th>`).join("")}</tr><tr>${counts.map(c=>`<td>${c}표 (${Math.round(c/tot*100)}%)</td>`).join("")}</tr></table></div>`;});return h;};
   const pinsHtmlOf=list=>{const l=list.filter(x=>x.b.pin).map(x=>pinLine(x.b,ROWS)).filter(Boolean);return l.length?`<div class="pinbox">${l.join("<br>")}</div>`:"";};
   const title=CFG.meta.title||slug;
   let html=`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${esc(title)} 결과 보고서</title>
@@ -947,8 +947,15 @@ function _openReport(){
   .kpis{display:flex;gap:10px;margin-bottom:6px;flex-wrap:wrap}.kpi{border:1px solid #d4d0c8;border-radius:8px;padding:8px 14px;min-width:110px}.kpi b{font-size:19px;display:block}.kpi span{color:#6f6b64;font-size:11px}
   .secbar{margin:12px 0 6px;padding:5px 10px;border-left:4px solid #c1553a;background:#f4f2ee;font-size:12.5px}.secbar span{color:#6f6b64;font-size:11.5px}
   .pinbox{border:1px solid #c1553a;background:#fbf3ef;border-radius:8px;padding:8px 12px;margin:8px 0;font-size:12.5px;line-height:1.7}
-  .bsec{page-break-before:always;break-before:page}.bsec.nobreak{page-break-before:auto;break-before:auto}
-  @media print{.toolbar{display:none}body{padding:6px 4px}}</style></head><body>
+  .bsec{break-inside:avoid;page-break-inside:avoid}.bsec + .bsec{page-break-before:always;break-before:page}.bsec.nobreak{page-break-before:auto;break-before:auto}
+  @media screen{.bsec + .bsec:not(.nobreak)::before{content:"── PDF 로 저장하면 여기서 새 페이지가 시작됩니다 ──";display:block;margin:30px 0 14px;padding:6px 0;border-top:2px dashed #c9c4ba;text-align:center;font-size:11px;color:#9a958d}}
+  .vq{break-inside:avoid;page-break-inside:avoid}
+  @media print{.toolbar{display:none}body{padding:0;font-size:11.5px;line-height:1.4}
+    h1{font-size:19px}.sub{margin-bottom:10px}h2{margin:12px 0 6px;font-size:13.5px}h2.bh{font-size:15.5px}
+    table{font-size:11px;margin-bottom:4px}th,td{padding:3px 6px}
+    .kpis{gap:6px;margin-bottom:4px}.kpi{padding:5px 10px;min-width:90px}.kpi b{font-size:16px}
+    table,tr,.kpis,.pinbox,.op,.secbar{break-inside:avoid;page-break-inside:avoid}
+    h2,.secbar{break-after:avoid;page-break-after:avoid}}</style></head><body>
   <div class="toolbar">${multi?`<select id="vsel" aria-label="보고서 범위"><option value="__all">전체 (브랜드별 페이지 나눔)</option>${brands.map((b,i)=>`<option value="b${i}">${esc(b)}만</option>`).join("")}${(tblocks.length||ops.length)?`<option value="__common">투표·의견만</option>`:""}</select>`:""}<button onclick="window.print()">🖨 인쇄 / PDF 저장</button></div>
   <h1>${esc(title)} — ${HASP?"시식 평가":"투표"} 결과 보고서<span id="bt"></span></h1>
   <div class="sub">회차: ${esc(slug)} · 응답자 ${ROWS.length}명 · 생성 ${esc(new Date().toLocaleString('ko-KR'))}</div>
