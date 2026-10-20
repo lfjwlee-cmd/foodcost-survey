@@ -103,18 +103,22 @@
   .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:17px 18px;box-shadow:var(--shadow);min-width:0}
   .card h2{font-size:15px;font-weight:600;margin:0 0 3px}.card .cap{font-size:12px;color:var(--faint);margin:0 0 14px}
   section.block{margin-top:14px}
+  .dash-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-top:14px;align-items:start}
+  .dcol{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .dash-cols .card{margin:0}
+  @media(max-width:900px){.dash-cols{grid-template-columns:1fr}.dcol{display:contents}.dash-cols .c-rank{order:1}.dash-cols .c-heat{order:2}.dash-cols .c-tally{order:3}.dash-cols .c-opin{order:4}.dash-cols>.dcol>.card{margin-bottom:0}.dash-cols{row-gap:14px}}
   .insight{background:linear-gradient(180deg,var(--accent-soft),transparent);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:14px}.insight b{color:var(--accent)}
   table{width:100%;border-collapse:collapse;font-size:13px}
   th{text-align:left;font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:500;padding:0 8px 8px;border-bottom:1px solid var(--line)}
   td{padding:10px 8px;border-bottom:1px solid var(--line)}tr:last-child td{border-bottom:none}
-  .prod-cell b{font-weight:600}.prod-cell span{display:block;font-size:11px;color:var(--faint)}
+  .prod-cell b{font-weight:600}.prod-cell span:not(.brand-dot){display:block;font-size:11px;color:var(--faint)}
   .signal{font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap}
   .sig-go{background:color-mix(in srgb,var(--good) 15%,transparent);color:var(--good)}.sig-hold{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}.sig-no{background:color-mix(in srgb,var(--bad) 15%,transparent);color:var(--bad)}
   .score-b{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-weight:600}
   .heat{display:grid;gap:4px;overflow-x:auto}.heat-row{display:grid;gap:4px;min-width:430px}
-  .heat-h{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--faint);text-align:center;padding:4px 0}
+  .heat-h{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--faint);text-align:center;padding:4px 0;line-height:1.2;word-break:keep-all;overflow-wrap:anywhere}
   .heat-rl{font-size:12px;color:var(--muted);display:flex;align-items:center;font-weight:500}
-  .cell{border-radius:7px;padding:10px 0;text-align:center;font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-weight:600;font-size:13.5px;color:var(--ink)}
+  .cell{border-radius:7px;padding:9px 0;text-align:center;font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-weight:600;font-size:13.5px;color:var(--ink)}
   .radar-wrap{display:flex;justify-content:center;padding:6px 0}.radar-legend{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:6px;font-size:12px;color:var(--muted)}.lg{display:inline-flex;align-items:center;gap:6px}.lg i{width:11px;height:3px;border-radius:2px}
   .bar-row{display:grid;grid-template-columns:120px 1fr 42px;align-items:center;gap:10px;margin-bottom:8px;font-size:12.5px}
   .bar-track{background:var(--surface-2);border-radius:6px;height:21px;overflow:hidden;border:1px solid var(--line)}.bar-fill{height:100%;border-radius:6px 0 0 6px;background:var(--accent);transition:width .4s}.bar-fill.alt{background:color-mix(in srgb,var(--accent) 55%,var(--muted))}
@@ -520,10 +524,16 @@ function _renderDash(){
     dh+=`<section class="card block"><h2 style="margin-bottom:12px">제품 상세</h2><div class="prod-picker" id="prodPicker"></div>
       <div class="grid g2"><div><p class="cap" style="margin-bottom:2px">관능 프로필</p><div class="radar-wrap"><svg id="radar" width="300" height="240" viewBox="0 0 300 240"></svg></div><div class="radar-legend" id="radarLegend"></div></div>
       <div id="votes"></div></div></section>
-      <div class="card block"><h2>🚦 제품 랭킹 · 출시 판정</h2><p class="cap" id="rankCap">맛·관능 기준</p><div style="overflow-x:auto"><table id="rankTable"></table></div></div>
-      <div class="card block"><h2>🔥 세그먼트 × 항목 히트맵</h2><p class="cap">연령대별 ${AXES.length}항목 평균 · 칸 색이 진할수록 높은 점수 · "–"는 해당 응답 없음</p><div class="chips" id="heatMode" style="margin:0 0 10px"></div><div class="heat" id="heat"></div></div>
-      <div class="card block"><h2>🗳️ 선택·투표 집계</h2><p class="cap">문항별 득표수와 비율 · 1위는 굵게 표시 · 구분 제목별로 묶음</p><div id="tally"></div></div>
-      <div class="card block"><h2>💬 종합 의견</h2><p class="cap">자유 서술</p><div id="opinions"></div></div>`;
+      <div class="dash-cols">
+        <div class="dcol">
+          <div class="card c-rank"><h2>🚦 제품 랭킹 · 출시 판정</h2><p class="cap" id="rankCap">맛·관능 기준</p><div style="overflow-x:auto"><table id="rankTable"></table></div></div>
+          <div class="card c-tally"><h2>🗳️ 선택·투표 집계</h2><p class="cap">문항별 득표수와 비율 · 1위는 굵게 표시 · 구분 제목별로 묶음</p><div id="tally"></div></div>
+        </div>
+        <div class="dcol">
+          <div class="card c-heat"><h2>🔥 세그먼트 × 항목 히트맵</h2><p class="cap">연령대별 ${AXES.length}항목 평균 · 칸 색이 진할수록 높은 점수 · "–"는 해당 응답 없음</p><div class="chips" id="heatMode" style="margin:0 0 10px"></div><div class="heat" id="heat"></div></div>
+          <div class="card c-opin"><h2>💬 종합 의견</h2><p class="cap">자유 서술</p><div id="opinions"></div></div>
+        </div>
+      </div>`;
   }else{
     // 일반 투표 설문 — 관능(제품) 카드는 그리지 않는다
     dh+=`<div class="card block"><h2>🗳️ 문항별 응답 집계</h2><p class="cap">선택지별 득표</p><div id="tally"></div></div>
@@ -719,7 +729,7 @@ function renderHeat(ev){const el=$("heat");el.innerHTML="";
     const gev=g.evs, GA=g.axes, cols=GA.length;
     if(mode==="product"||groups.length>1){const t=document.createElement("div");t.className="cap";t.style.cssText="margin:14px 0 5px;font-weight:600;color:var(--ink)";
       t.innerHTML=(g.brand?`<span class="brand-dot" style="background:${brandColor(g.brand)}"></span>`:"")+esc(g.title||g.names.join(" · "))+(mode==="product"?` <span style="font-weight:400;color:var(--faint)">· 응답 ${gev.length}명</span>`:"");el.appendChild(t);}
-    const mk=inner=>{const d=document.createElement("div");d.className="heat-row";d.style.gridTemplateColumns=`70px repeat(${cols},1fr)`;d.style.minWidth=Math.max(430,70+cols*68)+"px";d.innerHTML=inner;return d;};
+    const mk=inner=>{const d=document.createElement("div");d.className="heat-row";d.style.gridTemplateColumns=`58px repeat(${cols},1fr)`;d.style.minWidth=Math.max(340,58+cols*44)+"px";d.innerHTML=inner;return d;};
     el.appendChild(mk(`<div></div>`+GA.map(a=>`<div class="heat-h">${esc(a.label)}</div>`).join("")));
     const rowOf=(label,sub)=>{let c=`<div class="heat-rl">${esc(label)}</div>`;
       c+=GA.map(a=>{const vals=sub.map(e=>e.s[a.key]).filter(v=>typeof v==="number");if(!vals.length)return `<div class="cell" style="color:var(--faint);background:var(--surface-2)">–</div>`;any=true;const v=avg(vals);return `<div class="cell" style="background:${heatColor(v)}">${f1(v)}</div>`;}).join("");
