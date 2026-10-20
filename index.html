@@ -103,10 +103,18 @@
   .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:17px 18px;box-shadow:var(--shadow);min-width:0}
   .card h2{font-size:15px;font-weight:600;margin:0 0 3px}.card .cap{font-size:12px;color:var(--faint);margin:0 0 14px}
   section.block{margin-top:14px}
-  .dash-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-top:14px;align-items:start}
+  #dash.wrap{max-width:1640px}
+  .dash-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px;margin-top:14px;align-items:start}
+  .dash-grid .card{margin:0}
+  .dash-grid .c-detail{grid-column:1/5}
+  .dash-grid .c-opin{grid-column:5/7;align-self:stretch;display:flex;flex-direction:column;min-height:300px}
+  .c-opin .opin-scroll{flex:1;min-height:0;position:relative}
+  .c-opin #opinions{position:absolute;inset:0;overflow:auto;padding-right:4px}
+  .c-opin .op{margin-bottom:8px}
   .dcol{display:flex;flex-direction:column;gap:14px;min-width:0}
-  .dash-cols .card{margin:0}
-  @media(max-width:900px){.dash-cols{grid-template-columns:1fr}.dcol{display:contents}.dash-cols .c-rank{order:1}.dash-cols .c-heat{order:2}.dash-cols .c-tally{order:3}.dash-cols .c-opin{order:4}.dash-cols>.dcol>.card{margin-bottom:0}.dash-cols{row-gap:14px}}
+  .dash-grid .dcol-l{grid-column:1/4}.dash-grid .dcol-r{grid-column:4/7}
+  .c-detail .prod-picker{margin-bottom:8px}.c-detail #votes .bar-row{margin-bottom:5px}.c-detail .radar-wrap{padding:0}.c-detail .radar-legend{margin-top:2px}
+  @media(max-width:1000px){.dash-grid{grid-template-columns:1fr}.dash-grid .c-detail,.dash-grid .c-opin,.dash-grid .dcol-l,.dash-grid .dcol-r{grid-column:auto}.dcol{display:contents}.dash-grid .c-opin{align-self:auto;min-height:0}.c-opin #opinions{position:static;max-height:420px}.c-detail{order:1}.c-rank{order:2}.c-heat{order:3}.c-tally{order:4}.c-opin{order:5}}
   .insight{background:linear-gradient(180deg,var(--accent-soft),transparent);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:14px}.insight b{color:var(--accent)}
   table{width:100%;border-collapse:collapse;font-size:13px}
   th{text-align:left;font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:500;padding:0 8px 8px;border-bottom:1px solid var(--line)}
@@ -521,19 +529,19 @@ function _renderDash(){
   const HASP=hasProd();
   let dh=`<div class="kpis" id="kpis"></div><div class="insight" id="insight"></div>`;
   if(HASP){
-    dh+=`<section class="card block"><h2 style="margin-bottom:12px">제품 상세</h2><div class="prod-picker" id="prodPicker"></div>
-      <div class="grid g2"><div><p class="cap" style="margin-bottom:2px">관능 프로필</p><div class="radar-wrap"><svg id="radar" width="300" height="240" viewBox="0 0 300 240"></svg></div><div class="radar-legend" id="radarLegend"></div></div>
-      <div id="votes"></div></div></section>
-      <div class="dash-cols">
-        <div class="dcol">
-          <div class="card c-rank"><h2>🚦 제품 랭킹 · 출시 판정</h2><p class="cap" id="rankCap">맛·관능 기준</p><div style="overflow-x:auto"><table id="rankTable"></table></div></div>
-          <div class="card c-tally"><h2>🗳️ 선택·투표 집계</h2><p class="cap">문항별 득표수와 비율 · 1위는 굵게 표시 · 구분 제목별로 묶음</p><div id="tally"></div></div>
-        </div>
-        <div class="dcol">
-          <div class="card c-heat"><h2>🔥 세그먼트 × 항목 히트맵</h2><p class="cap">연령대별 ${AXES.length}항목 평균 · 칸 색이 진할수록 높은 점수 · "–"는 해당 응답 없음</p><div class="chips" id="heatMode" style="margin:0 0 10px"></div><div class="heat" id="heat"></div></div>
-          <div class="card c-opin"><h2>💬 종합 의견</h2><p class="cap">자유 서술</p><div id="opinions"></div></div>
-        </div>
-      </div>`;
+    dh+=`<div class="dash-grid">
+      <section class="card c-detail"><h2 style="margin-bottom:10px">제품 상세</h2><div class="prod-picker" id="prodPicker"></div>
+        <div class="grid g2"><div><p class="cap" style="margin-bottom:2px">관능 프로필</p><div class="radar-wrap"><svg id="radar" width="300" height="240" viewBox="0 0 300 240"></svg></div><div class="radar-legend" id="radarLegend"></div></div>
+        <div id="votes"></div></div></section>
+      <div class="card c-opin"><h2>💬 종합 의견</h2><p class="cap" id="opinCap">자유 서술</p><div class="opin-scroll"><div id="opinions"></div></div></div>
+      <div class="dcol dcol-l">
+        <div class="card c-rank"><h2>🚦 제품 랭킹 · 출시 판정</h2><p class="cap" id="rankCap">맛·관능 기준</p><div style="overflow-x:auto"><table id="rankTable"></table></div></div>
+        <div class="card c-tally"><h2>🗳️ 선택·투표 집계</h2><p class="cap">문항별 득표수와 비율 · 1위는 굵게 표시 · 구분 제목별로 묶음</p><div id="tally"></div></div>
+      </div>
+      <div class="dcol dcol-r">
+        <div class="card c-heat"><h2>🔥 세그먼트 × 항목 히트맵</h2><p class="cap">연령대별 ${AXES.length}항목 평균 · 칸 색이 진할수록 높은 점수 · "–"는 해당 응답 없음</p><div class="chips" id="heatMode" style="margin:0 0 10px"></div><div class="heat" id="heat"></div></div>
+      </div>
+    </div>`;
   }else{
     // 일반 투표 설문 — 관능(제품) 카드는 그리지 않는다
     dh+=`<div class="card block"><h2>🗳️ 문항별 응답 집계</h2><p class="cap">선택지별 득표</p><div id="tally"></div></div>
@@ -760,7 +768,8 @@ function renderDetail(names){const nm=names[dstate.product];const pe=evAll().fil
 function renderOpinions(resp){const el=$("opinions");const texts=CFG.blocks.filter(b=>b.type==="text").map(b=>b.q);const list=[];
   resp.forEach(r=>{texts.forEach(q=>{const v=(r.extras||{})[q];if(v&&v.trim&&v.trim()&&v!=="."&&v!=="-")list.push({t:v,meta:`${r.age} ${r.gender}`});});});
   if(!list.length){el.innerHTML=`<div class="empty">의견 없음</div>`;return;}
-  el.innerHTML=list.slice(-10).reverse().map(o=>`<div class="op"><q>"${esc(o.t)}"</q><div class="op-meta">${esc(o.meta)}</div></div>`).join("");}
+  const oc=$("opinCap"); if(oc) oc.textContent=`자유 서술 · 총 ${list.length}건${list.length>30?" 중 최근 30건 (전부는 PDF·엑셀)":""} · 최근 순`;
+  el.innerHTML=list.slice(-30).reverse().map(o=>`<div class="op"><q>"${esc(o.t)}"</q><div class="op-meta">${esc(o.meta)}</div></div>`).join("");}
 function renderTally(resp){const el=$("tally");
   const list=pickWithSec();
   if(!list.length){el.innerHTML=`<div class="empty">집계 문항 없음</div>`;return;}
