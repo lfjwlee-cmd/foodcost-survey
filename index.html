@@ -625,23 +625,36 @@ function axesForProd(cfg,b){
   let ax=brs.length===1?axesOf(cfg,brs[0]):((cfg&&cfg.axes)||[]);
   const po=((cfg&&cfg.meta&&cfg.meta.productAxes)||{})[b&&b.name];
   if(po) ax=ax.map(a=>{const o=po[a.key]; return o?Object.assign({},a,{label:(o.label||"")||a.label,hint:o.hint!=null?o.hint:a.hint}):a;});
+  const tn=((cfg&&cfg.meta&&cfg.meta.productTaste)||{})[b&&b.name];
+  if(typeof tn==="number") ax=ax.map((a,i)=>Object.assign({},a,{group:i<tn?"taste":"sensory"}));
   return ax;
 }
-/* "맛" = taste 그룹 축들의 평균(구형은 1개, 신형은 여러 개일 수 있음) */
+/* 제품별 "맛" 칸 수 — cfg.meta.productTaste[제품명]=N 이면 그 제품은 축 목록 앞의 N개가 맛, 나머지가 관능이다.
+   없으면 축의 group(회차 기본)을 따른다. 점수 데이터(item)에 제품 이름(name)이 들어 있어 평균 계산 함수가 스스로 조회한다. */
+function groupedAxes(axes,name){
+  const n=((CFG&&CFG.meta&&CFG.meta.productTaste)||{})[name];
+  return (typeof n==="number")?axes.map((a,i)=>Object.assign({},a,{group:i<n?"taste":"sensory"})):axes;
+}
+function tasteNOf(name){ return groupedAxes(AXES,name).filter(a=>axisGroup(a)==="taste").length; }
+/* 제품마다 맛 칸 수가 다른 회차인지 — 다르면 판정 문구를 일반화하고 랭킹에 칸 수를 표시한다 */
+function splitMixed(){ const ns=new Set((CFG.blocks||[]).filter(b=>b.type==="product").map(b=>tasteNOf(b.name))); return ns.size>1; }
+function splitTag(name){ return splitMixed()?`맛${tasteNOf(name)}·관능${AXES.length-tasteNOf(name)}`:""; }
 /* 판정 문구에 쓰는 맛/관능 라벨 — 축 그룹 구성이 몇 개든 실제 개수를 그대로 반영한다.
-   구형(맛 1개)은 지금처럼 "맛"만, 3개 이상이면 "맛(N축 평균)"으로 표시 */
+   구형(맛 1개)은 지금처럼 "맛"만, 3개 이상이면 "맛(N축 평균)"으로 표시. 제품마다 다르면 "해당 항목 평균" */
 function axisLabels(){
-  const tN=AXES.filter(a=>axisGroup(a)==="taste").length;
-  const sN=AXES.filter(a=>axisGroup(a)!=="taste").length;
+  if(splitMixed()) return { taste:"맛(해당 항목 평균)", sensory:"관능(그 외 항목 평균)" };
+  const ps=(CFG.blocks||[]).filter(b=>b.type==="product");
+  const tN=ps.length?tasteNOf(ps[0].name):AXES.filter(a=>axisGroup(a)==="taste").length;
+  const sN=AXES.length-tN;
   return { taste: tN>1?`맛(${tN}축 평균)`:"맛", sensory:`관능(그 외 ${sN}축 평균)` };
 }
 function tasteAvgOf(sc){
-  const vals=AXES.filter(a=>axisGroup(a)==="taste").map(a=>sc[a.key]).filter(v=>typeof v==="number");
+  const vals=groupedAxes(AXES,sc&&sc.name).filter(a=>axisGroup(a)==="taste").map(a=>sc[a.key]).filter(v=>typeof v==="number");
   return vals.length?avg(vals):0;
 }
 /* "관능" = sensory 그룹 축들의 평균 */
 function otherAxisAvg(sc){
-  const vals=AXES.filter(a=>axisGroup(a)!=="taste").map(a=>sc[a.key]).filter(v=>typeof v==="number");
+  const vals=groupedAxes(AXES,sc&&sc.name).filter(a=>axisGroup(a)!=="taste").map(a=>sc[a.key]).filter(v=>typeof v==="number");
   return vals.length?avg(vals):0;
 }
 /* 판정 — 화면·PDF·엑셀이 전부 이 함수를 거친다. n을 생략하면 표본 게이트 없이 순수 점수만 판정(집계용 KPI 등) */
@@ -669,7 +682,7 @@ function renderRank(ev){const t=$("rankTable");const names=[...new Set(ev.map(e=
   const cap=$("rankCap");
   if(cap){ const AL=axisLabels(); cap.innerHTML=`${AL.taste} ${TASTE_MIN} 이상 · ${AL.sensory} ${SENSORY_MIN} 이상 기준 · 표본 ${MIN_SAMPLE}명 미만은 <b>표본 부족</b>`; }
   t.innerHTML=`<thead><tr><th>제품</th><th>맛</th><th>관능</th><th>표본</th><th>판정</th></tr></thead><tbody>`+rows.map(x=>`<tr>
-    <td class="prod-cell"><b><span class="brand-dot" style="background:${brandColor(prodBrands(x.p)[0]||x.p.brand)}"></span>${esc(x.p.name)}</b><span>${esc(brandLabel(x.p))} · ${esc(x.p.cat||"")}</span></td>
+    <td class="prod-cell"><b><span class="brand-dot" style="background:${brandColor(prodBrands(x.p)[0]||x.p.brand)}"></span>${esc(x.p.name)}</b><span>${esc(brandLabel(x.p))} · ${esc(x.p.cat||"")}${splitTag(x.p.name)?` · <b style="color:var(--accent)">${splitTag(x.p.name)}</b>`:""}</span></td>
     <td class="score-b">${f1(x.taste)}</td><td class="score-b">${f1(x.sensory)}</td><td class="num" style="color:var(--faint)">${x.n}</td><td>${signal(x.taste,x.sensory,x.n)}</td></tr>`).join("")+`</tbody>`;}
 function heatColor(v){const t=Math.max(0,Math.min(1,(v-2.5)/2));const hue=8+t*132;const alpha=0.16+0.5*Math.abs(v-3)/2;return `hsl(${hue} 62% 48% / ${alpha})`;}
 function renderHeat(ev){const el=$("heat");el.innerHTML="";
@@ -769,8 +782,9 @@ function _exportXlsx(){
       return {name:nm,brand:brandLabel(pe[0]),taste:+f1(avg(pe.map(x=>tasteAvgOf(x.s)))),
               sensory:+f1(avg(pe.map(x=>otherAxisAvg(x.s)))),n:pe.length};}).sort((a,b)=>(b.taste+b.sensory)-(a.taste+a.sensory));
     sum.push(["제품 랭킹"]);
-    sum.push(["순위","제품","브랜드","맛","관능","표본","판정"]);
-    rank.forEach((x,i)=>sum.push([i+1,x.name,x.brand,x.taste,x.sensory,x.n,sigPlain(x.taste,x.sensory,x.n)]));
+    const mixedX=splitMixed();
+    sum.push(["순위","제품","브랜드","맛","관능","표본","판정"].concat(mixedX?["맛/관능 칸 수"]:[]));
+    rank.forEach((x,i)=>sum.push([i+1,x.name,x.brand,x.taste,x.sensory,x.n,sigPlain(x.taste,x.sensory,x.n)].concat(mixedX?[tasteNOf(x.name)+"/"+(AXES.length-tasteNOf(x.name))]:[])));
     sum.push([]);
     { const AL=axisLabels(); sum.push(["※ 판정 기준: "+AL.taste+" "+TASTE_MIN+" 이상 그리고 "+AL.sensory+" "+SENSORY_MIN+" 이상이면 다음 단계 진행 / 하나라도 미달이면 해당 항목 보강 / 둘 다 미달이면 맛·관능 보강 / 표본 "+MIN_SAMPLE+"명 미만이면 표본 부족"]); }
   }else{
@@ -881,11 +895,11 @@ function _openReport(){
   evA.forEach(e=>prodBrands(e).forEach(n=>{if(n&&!brands.includes(n))brands.push(n);}));
   const multi=HASP&&brands.length>=2;
   const kpiHtml=(evx,rowsx)=>{const rk=rankOf(evx);return `<div class="kpis"><div class="kpi"><b>${rowsx.length}명</b><span>응답</span></div><div class="kpi"><b>${rk.length}종</b><span>평가 제품</span></div><div class="kpi"><b>${rk.length?f1(rk[0].taste):"-"}/5</b><span>맛 · ${rk.length?esc(rk[0].name):"-"}</span></div><div class="kpi"><b>${rk.length?f1(rk[0].sensory):"-"}/5</b><span>관능 · ${rk.length?esc(rk[0].name):"-"}</span></div></div>`;};
-  const rankTable=(rk,withBrand)=>`<table><tr><th class="l">제품</th>${withBrand?"<th>브랜드</th>":""}<th>맛</th><th>관능</th><th>표본</th><th>판정</th></tr>${rk.map(x=>`<tr><td class="l">${esc(x.name)}</td>${withBrand?`<td>${esc(x.brand||"")}</td>`:""}<td>${f1(x.taste)}</td><td>${f1(x.sensory)}</td><td>${x.n}</td><td>${sigTxt(x.taste,x.sensory,x.n)}</td></tr>`).join("")}</table>`;
+  const rankTable=(rk,withBrand)=>`<table><tr><th class="l">제품</th>${withBrand?"<th>브랜드</th>":""}<th>맛</th><th>관능</th><th>표본</th><th>판정</th></tr>${rk.map(x=>`<tr><td class="l">${esc(x.name)}${splitTag(x.name)?`<br><small style="color:#c1553a">${splitTag(x.name)}</small>`:""}</td>${withBrand?`<td>${esc(x.brand||"")}</td>`:""}<td>${f1(x.taste)}</td><td>${f1(x.sensory)}</td><td>${x.n}</td><td>${sigTxt(x.taste,x.sensory,x.n)}</td></tr>`).join("")}</table>`;
   const AL=axisLabels();
   const rule=`<p class="note">※ ${AL.taste} ${TASTE_MIN} 이상 그리고 ${AL.sensory} ${SENSORY_MIN} 이상이면 다음 단계 진행 판정입니다. 표본 ${MIN_SAMPLE}명 미만은 표본 부족으로 표시됩니다.</p>`;
   /* 제품별 항목 평균 — 항목 이름 구성이 같은 제품끼리 한 표로 묶는다(이름이 다르면 표가 나뉨) */
-  const axisTable=rk=>{const gs=[];rk.forEach(x=>{const ax=axesForProd(CFG,x.pe[0]||{});const sig=ax.map(a=>a.label).join("|");let g=gs.find(y=>y.sig===sig);if(!g){g={sig,axes:ax,rows:[]};gs.push(g);}g.rows.push(x);});
+  const axisTable=rk=>{const gs=[];rk.forEach(x=>{const ax=axesForProd(CFG,x.pe[0]||{});const sig=ax.map(a=>a.label+(axisGroup(a)==="taste"?"•":"")).join("|");let g=gs.find(y=>y.sig===sig);if(!g){g={sig,axes:ax,rows:[]};gs.push(g);}g.rows.push(x);});
     return gs.map(g=>`<table><tr><th class="l">제품</th>${g.axes.map(a=>`<th>${esc(a.label)}<br><small>${axisGroup(a)==="taste"?"맛":"관능"}</small></th>`).join("")}</tr>${g.rows.map(x=>`<tr><td class="l">${esc(x.name)}</td>${g.axes.map(a=>{const vals=x.pe.map(e=>e.s[a.key]).filter(v=>typeof v==="number");return `<td>${vals.length?f1(avg(vals)):"–"}</td>`;}).join("")}</tr>`).join("")}</table>`).join("");};
   /* 투표 집계 — 구분 제목(소속 브랜드 포함) 단위로 묶어 출력. 브랜드 페이지에는 그 브랜드 소속 구역 + 공통(소속 없음) 구역을 넣는다 */
   const picksS=pickWithSec();
@@ -1089,13 +1103,13 @@ function axCtx(){
   if(T.indexOf("b:")===0){ const br=T.slice(2);
     return {kind:"b",name:br,get:()=>(ed.brandAxes||{})[br]||{},ensure:()=>{ed.brandAxes=ed.brandAxes||{};return ed.brandAxes[br]=ed.brandAxes[br]||{};},prune:m=>{if(!Object.keys(m).length)delete ed.brandAxes[br];},drop:()=>{delete (ed.brandAxes||{})[br];},base:a=>({label:a.label,hint:a.hint})}; }
   if(T.indexOf("p:")===0){ const it=edProds().find(q=>q.uid===T.slice(2)); if(it){ const brs=it.brands||[it.brand]; const bo=brs.length===1?((ed.brandAxes||{})[brs[0]]||{}):{};
-    return {kind:"p",name:it.name||"(이름 없음)",get:()=>it.axov||{},ensure:()=>(it.axov=it.axov||{}),prune:()=>{},drop:()=>{it.axov={};},base:a=>{const o=bo[a.key];return {label:(o&&o.label)||a.label,hint:(o&&o.hint!=null)?o.hint:a.hint};}}; } }
+    return {kind:"p",it,name:it.name||"(이름 없음)",get:()=>it.axov||{},ensure:()=>(it.axov=it.axov||{}),prune:()=>{},drop:()=>{it.axov={};it.tasteN=null;},base:a=>{const o=bo[a.key];return {label:(o&&o.label)||a.label,hint:(o&&o.hint!=null)?o.hint:a.hint};}}; } }
   return null;
 }
 function updateAxisNote(){ const el=$("axDiff"); if(!el||!ed)return;
-  document.querySelectorAll("#ed_items [data-axp]").forEach(b=>{const q=edProds().find(p=>p.uid===b.dataset.axp); b.textContent="✎ 항목 이름"+(q&&Object.keys(q.axov||{}).length?" ●":"");}); // 제품 카드의 변경 표시
+  document.querySelectorAll("#ed_items [data-axp]").forEach(b=>{const q=edProds().find(p=>p.uid===b.dataset.axp); b.textContent="✎ 항목 이름"+(q&&(Object.keys(q.axov||{}).length||typeof q.tasteN==="number")?" ●":"");}); // 제품 카드의 변경 표시
   const c=axCtx();
-  if(c){ const n=Object.keys(c.get()).length; el.textContent=n?`※ ${c.kind==="p"?"기본(공통·브랜드)":"공통"}과 다른 항목 ${n}개`:"바꾼 항목 없음 — 공통 이름을 따라가요"; return; }
+  if(c){ const n=Object.keys(c.get()).length+((c.kind==="p"&&c.it&&typeof c.it.tasteN==="number")?1:0); el.textContent=n?`※ ${c.kind==="p"?"기본(공통·브랜드)":"공통"}과 다른 항목 ${n}개`:"바꾼 항목 없음 — 공통 이름을 따라가요"; return; }
   el.textContent=axesChanged()?"※ 기본 이름과 다른 항목이 있습니다":"기본 이름 그대로"; }
 function renderAxisRows(){
   const wrap=$("ed_axes_wrap"); if(!wrap||!ed) return;
@@ -1114,13 +1128,27 @@ function renderAxisRows(){
       +`<optgroup label="제품 하나만">${prods.map(q=>`<option value="p:${esc(q.uid)}" ${ed.axT==="p:"+q.uid?"selected":""}>${esc(q.name)}${has(q.axov)}</option>`).join("")}</optgroup></select>`
       +`<span style="font-size:11.5px;color:var(--faint)">${C?`바꾸지 않은 항목은 ${C.kind==="p"?"브랜드·공통":"공통"} 이름을 따라가요`:`제품마다 맛이 다르면 위에서 제품을 골라 따로 바꾸세요 (제품 카드의 ✎ 버튼으로도 올 수 있어요)`}</span></div>`;
   }
+  /* 맛·관능 칸 수 — 회차 기본(공통 선택 시) 또는 제품 하나만(제품 선택 시). 앞에서부터 N개가 맛 */
+  const lenA=ed.axes.length, lo=Math.min(2,lenA-1), hi=Math.max(lenA-2,1);
+  const baseN=ed.axes.filter(a=>a.group==="taste").length;
+  const grpOf=(i,a)=>(C&&C.kind==="p"&&C.it&&typeof C.it.tasteN==="number")?(i<C.it.tasteN?"taste":"sensory"):a.group;
+  if(!C||C.kind==="p"){
+    const cur=!C?baseN:(typeof C.it.tasteN==="number"?C.it.tasteN:"");
+    const ops=[]; if(C) ops.push(`<option value="" ${cur===""?"selected":""}>회차 기본 (맛 ${baseN} + 관능 ${lenA-baseN})</option>`);
+    for(let n=lo;n<=hi;n++) ops.push(`<option value="${n}" ${cur===n?"selected":""}>맛 ${n} + 관능 ${lenA-n}</option>`);
+    h+=`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:2px 0 8px"><span style="font-size:12px;color:var(--muted)">맛·관능 칸 수</span><select id="axTasteN" ${L.locked?"disabled":""} style="border:1px solid var(--line-strong);background:var(--field);border-radius:8px;padding:6px 10px;font-family:inherit;font-size:13px;color:var(--ink)">${ops.join("")}</select><span style="font-size:11.5px;color:var(--faint)">${C?"이 제품만 바뀝니다 — 다른 제품과 구성이 달라지면 순위표 비교에 주의하세요":"회차 전체의 기본값입니다(맨 위 항목부터 N개가 맛). 총 항목 수는 그대로예요"}</span></div>`;
+  }
   h+=ed.axes.map((a,i)=>{ const B=C?C.base(a):null, o=C?C.get()[a.key]:null;
     const lv=C?((o&&o.label)?o.label:B.label):a.label, hv=C?((o&&o.hint!=null)?o.hint:B.hint):a.hint;
     const ph1=C?(B.label||a.defLabel):a.defLabel, ph2=C?B.hint:a.defHint;
-    return `<div class="erow" style="grid-template-columns:46px 1fr 1.4fr;margin-bottom:6px"><span class="type-badge" style="text-align:center;margin:0">${a.group==="taste"?"맛":"관능"}</span><input data-ax="${i}" data-k="label" maxlength="${AXIS_LABEL_MAX}" value="${esc(lv)}" placeholder="${esc(ph1)}" ${L.locked?"disabled":""}><input data-ax="${i}" data-k="hint" maxlength="${AXIS_HINT_MAX}" value="${esc(hv)}" placeholder="${esc(ph2)}" ${L.locked?"disabled":""}></div>`;}).join("");
+    return `<div class="erow" style="grid-template-columns:46px 1fr 1.4fr;margin-bottom:6px"><span class="type-badge" style="text-align:center;margin:0">${grpOf(i,a)==="taste"?"맛":"관능"}</span><input data-ax="${i}" data-k="label" maxlength="${AXIS_LABEL_MAX}" value="${esc(lv)}" placeholder="${esc(ph1)}" ${L.locked?"disabled":""}><input data-ax="${i}" data-k="hint" maxlength="${AXIS_HINT_MAX}" value="${esc(hv)}" placeholder="${esc(ph2)}" ${L.locked?"disabled":""}></div>`;}).join("");
   h+=`<div style="display:flex;gap:10px;align-items:center;margin-top:4px;flex-wrap:wrap"><button type="button" class="abtn" id="axReset" ${L.locked?"disabled":""}>${C?(C.kind==="p"?"브랜드·공통 이름과 같게":"공통 이름과 같게"):"기본값으로 되돌리기"}</button><span id="axDiff" style="font-size:11.5px;color:var(--faint)"></span></div>`;
   wrap.innerHTML=h; updateAxisNote();
   const sel=$("axBrandSel"); if(sel) sel.onchange=()=>{ ed.axT=sel.value; renderAxisRows(); renderItemRows(true); };
+  const tnSel=$("axTasteN"); if(tnSel) tnSel.onchange=()=>{ if(axisLockInfo().locked) return;
+    const v=tnSel.value===""?null:+tnSel.value, c=axCtx();
+    if(c&&c.kind==="p") c.it.tasteN=v; else if(v!=null) ed.axes.forEach((a,i)=>{a.group=i<v?"taste":"sensory";});
+    renderAxisRows(); renderItemRows(true); schedulePreview(); };
   wrap.oninput=e=>{ const t=e.target; if(!t||t.dataset.ax==null||L.locked) return;
     const a=ed.axes[+t.dataset.ax], k=t.dataset.k, c=axCtx();
     if(c){ // 브랜드·제품 전용 이름 — 기준과 같아지면 덮어쓰기를 지운다
@@ -1139,7 +1167,7 @@ function renderAxisRows(){
 function edProds(){ return (ed&&ed.items?ed.items:[]).filter(x=>x.kind==="product"); }
 function buildEditModel(){
   const items=(draft.blocks||[]).map(b=>{
-    if(b.type==="product"){ const brs=prodBrands(b).slice(); return {kind:"product",uid:newUid(),brands:brs,brand:brs[0]||"",name:b.name,tag:b.tag||"",axov:JSON.parse(JSON.stringify(((draft.meta&&draft.meta.productAxes)||{})[b.name]||{}))}; }
+    if(b.type==="product"){ const brs=prodBrands(b).slice(); return {kind:"product",uid:newUid(),brands:brs,brand:brs[0]||"",name:b.name,tag:b.tag||"",axov:JSON.parse(JSON.stringify(((draft.meta&&draft.meta.productAxes)||{})[b.name]||{})),tasteN:(draft.meta&&draft.meta.productTaste&&typeof draft.meta.productTaste[b.name]==="number")?draft.meta.productTaste[b.name]:null}; }
     const o={kind:"extra",type:b.type,q:b.q,label:b.label||"",opts:"",input:b.input||"",ph:b.type==="section"?(b.text||""):(b.ph||""),imgopts:[],req:b.req!==false,pin:!!b.pin,brands:Array.isArray(b.brands)?b.brands.slice():[]};
     if(b.type==="imgchoice") o.imgopts=(b.opts||[]).map(x=>({label:x.label||"",image:x.image||""}));
     else o.opts=(b.opts||[]).join("\n");
@@ -1206,7 +1234,7 @@ function renderItemRows(skipAxis){
   h+=ed.items.map((x,i)=>{
     let bl;
     if(x.kind==="product"){
-      const nax=Object.keys(x.axov||{}).length;
+      const nax=Object.keys(x.axov||{}).length+(typeof x.tasteN==="number"?1:0);
       bl=head(i,"제품 시식",`<button type="button" class="abtn" data-axp="${esc(x.uid)}" title="이 제품의 평가 항목 이름 바꾸기">✎ 항목 이름${nax?" ●":""}</button>`)
         +`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px"><span style="font-size:11.5px;color:var(--muted)">브랜드</span>${bopts.map(b=>{const on=(x.brands||[]).includes(b);return `<label class="bchip${on?" on":""}"><input type="checkbox" data-bi="${i}" data-bn="${esc(b)}" ${on?"checked":""}> ${esc(b)}</label>`;}).join("")}<span style="font-size:11px;color:var(--faint)">둘 이상 고르면 공통 메뉴</span></div>`
         +`<div class="erow" style="grid-template-columns:1.2fr 1fr 38px"><input value="${esc(x.name)}" data-i="${i}" data-k="name" placeholder="제품명"><input value="${esc(x.tag)}" data-i="${i}" data-k="tag" placeholder="태그(예: 칼국수·기본)"><button class="del" data-i="${i}">×</button></div>`;
@@ -1296,7 +1324,8 @@ function buildDraftCfg(){
   // 평가 항목 이름·설명 반영(key·그룹은 그대로). 응답이 있어 잠긴 회차는 원래 축을 그대로 둔다
   if(ed.axes&&ed.axes.length&&Array.isArray(cfg.axes)&&!axisLockInfo().locked){
     cfg.axes=cfg.axes.map((a,i)=>{const e=ed.axes[i]; if(!e||e.key!==a.key) return a;
-      return Object.assign({},a,{label:(e.label||"").trim()||e.defLabel,hint:(e.hint||"").trim()});});
+      const o={label:(e.label||"").trim()||e.defLabel,hint:(e.hint||"").trim()}; if(e.group&&e.group!==axisGroup(a)) o.group=e.group; // 맛·관능 칸 수를 바꿨을 때만 group 을 쓴다
+      return Object.assign({},a,o);});
     // 브랜드별 이름 — 제품이 있는 브랜드만, 실제 축 key 에 대해서만, 공통과 다른 값만 저장한다
     const ba={}; const keys=cfg.axes.map(a=>a.key);
     axBrands().forEach(br=>{ const m=(ed.brandAxes||{})[br]; if(!m) return; const o={};
@@ -1314,6 +1343,10 @@ function buildDraftCfg(){
         if(L===baseL&&H===baseH) return; o[k]={label:L,hint:H}; });
       if(Object.keys(o).length) pa[x.name]=o; });
     if(Object.keys(pa).length) cfg.meta.productAxes=pa; else delete cfg.meta.productAxes;
+    // 제품별 맛 칸 수 — 회차 기본과 다른 값만 저장
+    const baseNs=cfg.axes.filter(a=>axisGroup(a)==="taste").length, ptn={};
+    ed.items.forEach(x=>{ if(x.kind==="product"&&x.name&&typeof x.tasteN==="number"&&x.tasteN!==baseNs&&x.tasteN>=1&&x.tasteN<cfg.axes.length) ptn[x.name]=x.tasteN; });
+    if(Object.keys(ptn).length) cfg.meta.productTaste=ptn; else delete cfg.meta.productTaste;
   }
   cfg.blocks=blocks; return cfg;
 }
