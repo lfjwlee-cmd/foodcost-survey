@@ -134,6 +134,14 @@
   .dbtn{background:var(--surface);border:1px solid var(--line-strong);color:var(--muted);border-radius:9px;padding:7px 11px;font-size:12.5px;cursor:pointer;font-family:inherit}
   .dbtn:hover{border-color:var(--accent);color:var(--ink)}select.dbtn{padding:6px 8px;max-width:150px}
   .admin{max-width:760px}
+  .admin.wide{max-width:1200px}
+  .ed-split{display:grid;grid-template-columns:minmax(0,1fr) 450px;gap:18px;align-items:start}
+  .ed-prev{position:sticky;top:64px;min-width:0}
+  .ed-prev .acard{margin-bottom:0}
+  .ed-prev .prev-wrap{max-height:calc(100vh - 150px)}
+  @media(max-width:1020px){.ed-split{grid-template-columns:1fr}.ed-prev{position:static;order:-1}.ed-prev .prev-wrap{max-height:440px}.ed-prev .acard{margin-bottom:14px}}
+  .pv-flash{outline:3px solid var(--accent);outline-offset:-3px;transition:outline-color .6s}
+  .ov-on{border-color:var(--accent)!important}
   .admin>h1{font-size:20px;margin:4px 0 2px}
   .acard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:16px 18px;margin-bottom:14px}
   .acard h3{font-size:14px;margin:0 0 12px;font-weight:600;overflow:hidden}
@@ -973,7 +981,7 @@ async function loadSurveys(){
   try{ const {data}=await sb.from("svy_responses").select("survey_slug"); (data||[]).forEach(r=>{RESP_COUNTS[r.survey_slug]=(RESP_COUNTS[r.survey_slug]||0)+1;}); }catch(e){}
 }
 function renderAdmin(){
-  const body=$("adminBody");
+  const body=$("adminBody"); body.classList.toggle("wide",!!ed); // 편집기가 열려 있을 때만 폭을 넓혀 미리보기를 옆에 둔다
   if(!sb){ body.innerHTML='<div class="empty">서버(Supabase) 연결이 필요합니다.</div>'; return; }
   let h=`<h1>⚙️ 설문 관리</h1><p style="color:var(--muted);font-size:13px;margin:0 0 16px"><b>저장 &amp; 활성화</b>하면 응답 폼에 바로 반영됩니다. 지난 회차·응답은 그대로 보관됩니다.</p>`;
   h+=`<div class="acard"><h3>설문 회차 <span style="float:right;display:flex;gap:6px"><button class="abtn primary" id="btnNew">+ 새 시식</button><button class="abtn" id="btnNewVote">+ 새 투표</button></span></h3>
@@ -1138,10 +1146,17 @@ function renderAxisRows(){
     for(let n=lo;n<=hi;n++) ops.push(`<option value="${n}" ${cur===n?"selected":""}>맛 ${n} + 관능 ${lenA-n}</option>`);
     h+=`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:2px 0 8px"><span style="font-size:12px;color:var(--muted)">맛·관능 칸 수</span><select id="axTasteN" ${L.locked?"disabled":""} style="border:1px solid var(--line-strong);background:var(--field);border-radius:8px;padding:6px 10px;font-family:inherit;font-size:13px;color:var(--ink)">${ops.join("")}</select><span style="font-size:11.5px;color:var(--faint)">${C?"이 제품만 바뀝니다 — 다른 제품과 구성이 달라지면 순위표 비교에 주의하세요":"회차 전체의 기본값입니다(맨 위 항목부터 N개가 맛). 총 항목 수는 그대로예요"}</span></div>`;
   }
+  /* 공통을 고쳐도 반영되지 않는 개별 설정(제품·브랜드)이 있으면 알려주고 한 번에 통일할 수 있게 한다 */
+  if(!C){
+    const shadow=edProds().filter(q=>Object.keys(q.axov||{}).length||typeof q.tasteN==="number").map(q=>q.name||"(이름 없음)");
+    const bshadow=Object.keys(ed.brandAxes||{}).filter(b=>Object.keys(ed.brandAxes[b]||{}).length);
+    if(shadow.length||bshadow.length) h+=`<div style="border:1px solid var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent);border-radius:9px;padding:9px 12px;margin:2px 0 10px;font-size:12px;line-height:1.65">⚠ 개별 설정이 있는 곳은 <b>공통 이름을 바꿔도 그 칸이 따라 바뀌지 않아요</b> (개별 설정이 우선).<br>${shadow.length?`제품: ${shadow.map(esc).join(", ")}`:""}${shadow.length&&bshadow.length?" · ":""}${bshadow.length?`브랜드: ${bshadow.map(esc).join(", ")}`:""}<div style="margin-top:7px"><button type="button" class="abtn" id="axClearAll" ${L.locked?"disabled":""}>모든 개별·브랜드 설정을 지우고 공통으로 통일</button> <span style="color:var(--faint)">저장 전이라 「닫기」로 취소할 수 있어요</span></div></div>`;
+  }
   h+=ed.axes.map((a,i)=>{ const B=C?C.base(a):null, o=C?C.get()[a.key]:null;
     const lv=C?((o&&o.label)?o.label:B.label):a.label, hv=C?((o&&o.hint!=null)?o.hint:B.hint):a.hint;
     const ph1=C?(B.label||a.defLabel):a.defLabel, ph2=C?B.hint:a.defHint;
-    return `<div class="erow" style="grid-template-columns:46px 1fr 1.4fr;margin-bottom:6px"><span class="type-badge" style="text-align:center;margin:0">${grpOf(i,a)==="taste"?"맛":"관능"}</span><input data-ax="${i}" data-k="label" maxlength="${AXIS_LABEL_MAX}" value="${esc(lv)}" placeholder="${esc(ph1)}" ${L.locked?"disabled":""}><input data-ax="${i}" data-k="hint" maxlength="${AXIS_HINT_MAX}" value="${esc(hv)}" placeholder="${esc(ph2)}" ${L.locked?"disabled":""}></div>`;}).join("");
+    const ovL=!!(C&&o&&o.label), ovH=!!(C&&o&&o.hint!=null);
+    return `<div class="erow" style="grid-template-columns:46px 1fr 1.4fr${C?" 34px":""};margin-bottom:6px"><span class="type-badge" style="text-align:center;margin:0">${grpOf(i,a)==="taste"?"맛":"관능"}</span><input class="${ovL?"ov-on":""}" data-ax="${i}" data-k="label" maxlength="${AXIS_LABEL_MAX}" value="${esc(lv)}" placeholder="${esc(ph1)}" ${L.locked?"disabled":""}><input class="${ovH?"ov-on":""}" data-ax="${i}" data-k="hint" maxlength="${AXIS_HINT_MAX}" value="${esc(hv)}" placeholder="${esc(ph2)}" ${L.locked?"disabled":""}>${C?`<button type="button" class="abtn" data-axreset="${i}" title="이 줄만 ${C.kind==="p"?"브랜드·공통":"공통"} 이름으로 되돌리기" style="padding:6px 0" ${(ovL||ovH)&&!L.locked?"":"disabled"}>↺</button>`:""}</div>`;}).join("");
   h+=`<div style="display:flex;gap:10px;align-items:center;margin-top:4px;flex-wrap:wrap"><button type="button" class="abtn" id="axReset" ${L.locked?"disabled":""}>${C?(C.kind==="p"?"브랜드·공통 이름과 같게":"공통 이름과 같게"):"기본값으로 되돌리기"}</button><span id="axDiff" style="font-size:11.5px;color:var(--faint)"></span></div>`;
   wrap.innerHTML=h; updateAxisNote();
   const sel=$("axBrandSel"); if(sel) sel.onchange=()=>{ ed.axT=sel.value; renderAxisRows(); renderItemRows(true); };
@@ -1151,13 +1166,22 @@ function renderAxisRows(){
     renderAxisRows(); renderItemRows(true); schedulePreview(); };
   wrap.oninput=e=>{ const t=e.target; if(!t||t.dataset.ax==null||L.locked) return;
     const a=ed.axes[+t.dataset.ax], k=t.dataset.k, c=axCtx();
-    if(c){ // 브랜드·제품 전용 이름 — 기준과 같아지면 덮어쓰기를 지운다
-      const B=c.base(a), m=c.ensure();
-      const cur=m[a.key]||{label:B.label,hint:B.hint}; cur[k]=t.value; m[a.key]=cur;
-      if((cur.label||"").trim()===(B.label||"").trim()&&(cur.hint||"").trim()===(B.hint||"").trim()) delete m[a.key];
+    if(c){ // 브랜드·제품 전용 — 바꾼 칸(이름 또는 설명)만 개별 설정으로 두고, 기준과 같아지면 그 칸은 공통을 다시 따른다
+      const was=c.kind==="p"&&Object.keys(c.get()).length>0;
+      const B=c.base(a), m=c.ensure(); const cur=m[a.key]||{}; const v=t.value;
+      if(k==="label"?(!v.trim()||v.trim()===(B.label||"").trim()):(v.trim()===(B.hint||"").trim())) delete cur[k]; else cur[k]=v;
+      if(Object.keys(cur).length) m[a.key]=cur; else delete m[a.key];
       c.prune(m);
+      t.classList.toggle("ov-on",k in cur);
+      const rb2=wrap.querySelector(`[data-axreset="${t.dataset.ax}"]`); if(rb2) rb2.disabled=!m[a.key];
+      if(c.kind==="p"&&was!==(Object.keys(c.get()).length>0)) renderItemRows(true); // 제품 카드의 '↺ 공통으로' 버튼 표시 갱신
     } else a[k]=t.value;
     updateAxisNote(); };
+  wrap.querySelectorAll("[data-axreset]").forEach(b=>b.onclick=()=>{ if(axisLockInfo().locked) return; const c=axCtx(); if(!c) return; const a=ed.axes[+b.dataset.axreset];
+    const m=c.get(); delete m[a.key]; if(c.prune) c.prune(m); renderAxisRows(); renderItemRows(true); schedulePreview(); });
+  const clr=$("axClearAll"); if(clr) clr.onclick=()=>{ if(axisLockInfo().locked) return;
+    if(!confirm("모든 제품·브랜드의 개별 항목 이름·설명·맛 칸 수 설정을 지우고 공통을 따르게 합니다.\n(저장 전이라 「닫기」로 취소할 수 있어요) 계속할까요?")) return;
+    edProds().forEach(q=>{q.axov={};q.tasteN=null;}); ed.brandAxes={}; renderAxisRows(); renderItemRows(true); schedulePreview(); };
   const rb=$("axReset"); if(rb) rb.onclick=()=>{ if(axisLockInfo().locked) return;
     const c=axCtx();
     if(c) c.drop(); else ed.axes.forEach(a=>{a.label=a.defLabel;a.hint=a.defHint;});
@@ -1179,8 +1203,8 @@ function buildEditModel(){
 }
 function renderEditor(){
   const el=$("editorArea");
-  let h=`<div class="acard"><h3>👁 미리보기 <span style="font-weight:400;color:var(--faint);font-size:11px">— 응답자에게 보이는 화면 (편집하면 실시간 반영)</span></h3><div class="prev-wrap"><div id="previewBody" class="prev-body"></div></div></div>`;
-  h+=`<div class="acard"><h3>${draftIsNew?(edProds().length?"새 시식 만들기":"새 투표 설문 만들기"):("회차 편집 · "+(edProds().length?"시식":"투표"))} <button class="abtn ghost" id="edCancel" style="float:right">닫기</button></h3>`;
+  const prevHtml=`<div class="acard"><h3>👁 미리보기 <span style="font-weight:400;color:var(--faint);font-size:11px">— 응답자에게 보이는 화면 (편집하면 실시간 반영)</span></h3><div class="prev-wrap"><div id="previewBody" class="prev-body"></div></div></div>`;
+  let h=`<div class="acard"><h3>${draftIsNew?(edProds().length?"새 시식 만들기":"새 투표 설문 만들기"):("회차 편집 · "+(edProds().length?"시식":"투표"))} <button class="abtn ghost" id="edCancel" style="float:right">닫기</button></h3>`;
   h+=`<div class="fld"><label>회차 ID</label><input id="ed_slug" value="${esc(ed.slug)}" ${draftIsNew?'':'readonly style="opacity:.6"'}></div>`;
   h+=`<div class="fld"><label>제목</label><input id="ed_title" value="${esc(ed.title)}"></div>`;
   h+=`<div class="fld"><label>소개 문구</label><textarea id="ed_intro" rows="2">${esc(ed.intro)}</textarea></div>`;
@@ -1190,13 +1214,14 @@ function renderEditor(){
   h+=`<div class="fld"><label>구성 <span style="color:var(--faint)">(위에서 아래 순서대로 응답자에게 보여요 · ▲▼로 순서 변경 · 제품은 평가 항목이 자동으로 붙고, 제품이 하나도 없으면 <b>투표 설문</b>)</span></label><div id="ed_items"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="addbtn" id="addProduct">+ 제품</button><button class="addbtn" id="addExtra">+ 문항</button></div><p style="font-size:11.5px;color:var(--faint);margin:6px 0 0">문항 = 선택 투표 · 사진 투표 · 자유 의견. 제품 이름은 서로 달라야 합니다(같은 이름이면 점수가 섞여요).</p></div>`;
   h+=`<div class="fld" id="ed_axes_wrap"></div>`;
   h+=`<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="abtn primary" id="edSaveAct">저장 &amp; 응답 폼에 활성화</button><button class="abtn" id="edSave">저장만</button></div></div>`;
-  el.innerHTML=h;
+  el.innerHTML=`<div class="ed-split"><div class="ed-main">${h}</div><aside class="ed-prev">${prevHtml}</aside></div>`;
   $("ed_slug").oninput=e=>ed.slug=e.target.value.trim();
   $("ed_title").oninput=e=>ed.title=e.target.value;
   $("ed_intro").oninput=e=>ed.intro=e.target.value;
   $("ed_rubric").onchange=e=>{ed.showRubric=e.target.checked;};
   $("ed_ask").onchange=e=>{ed.askProfile=e.target.checked;};
   renderItemRows();
+  const edI=$("ed_items"); if(edI){ const go=e=>{const c=e.target.closest&&e.target.closest("[data-ci]"); if(c) previewTo(+c.dataset.ci);}; edI.addEventListener("focusin",go); edI.addEventListener("click",go); }
   $("addProduct").onclick=()=>{const b0=(BRANDS_REG[0]&&BRANDS_REG[0].name)||"";ed.items.push({kind:"product",uid:newUid(),brands:b0?[b0]:[],brand:b0,name:"새 제품",tag:"",axov:{}});renderItemRows();};
   $("addExtra").onclick=()=>{ed.items.push({kind:"extra",type:"choice",q:"q"+Math.random().toString(36).slice(2,7),label:"새 문항",opts:"",input:"",ph:""});renderItemRows();};
   $("edCancel").onclick=()=>{draft=null;ed=null;renderAdmin();};
@@ -1205,6 +1230,18 @@ function renderEditor(){
   updatePreview();
   el.addEventListener("input",schedulePreview);
   el.addEventListener("change",schedulePreview);
+}
+/* 편집기에서 고른 제품·문항을 오른쪽 미리보기에서 찾아 스크롤하고 잠깐 강조한다(저장 데이터에는 영향 없음) */
+function previewTo(i){
+  const pb=$("previewBody"); if(!pb||!ed) return; const form=pb.querySelector("form"); const it=ed.items[i]; if(!form||!it) return;
+  const shown=x=>x.kind==="product"?!!x.name:(x.type==="section"?!!((x.label||"").trim()||(x.ph||"").trim()):true); // 폼에 실제로 그려지는 항목만
+  if(!shown(it)) return;
+  let k=0; for(let j=0;j<i;j++) if(shown(ed.items[j])) k++;
+  const els=[...form.children].filter(e=>(e.classList.contains("sec-head")||e.matches("section.q"))&&!e.querySelector("[data-seg]"));
+  const t=els[k]; if(!t) return; const wrap=pb.closest(".prev-wrap"); if(!wrap) return;
+  const top=t.getBoundingClientRect().top-wrap.getBoundingClientRect().top+wrap.scrollTop-10;
+  wrap.scrollTo({top:Math.max(0,top),behavior:"smooth"});
+  els.forEach(e=>e.classList.remove("pv-flash")); t.classList.add("pv-flash"); setTimeout(()=>t.classList.remove("pv-flash"),900);
 }
 let _prevT=null;
 function schedulePreview(){ clearTimeout(_prevT); _prevT=setTimeout(updatePreview,180); }
@@ -1235,7 +1272,7 @@ function renderItemRows(skipAxis){
     let bl;
     if(x.kind==="product"){
       const nax=Object.keys(x.axov||{}).length+(typeof x.tasteN==="number"?1:0);
-      bl=head(i,"제품 시식",`<button type="button" class="abtn" data-axp="${esc(x.uid)}" title="이 제품의 평가 항목 이름 바꾸기">✎ 항목 이름${nax?" ●":""}</button>`)
+      bl=head(i,"제품 시식",`${nax?`<button type="button" class="abtn" data-axclear="${esc(x.uid)}" title="이 제품의 개별 항목 이름·설명·맛 칸 수를 모두 지우고 공통을 따르게 합니다">↺ 공통으로</button>`:""}<button type="button" class="abtn" data-axp="${esc(x.uid)}" title="이 제품의 평가 항목 이름 바꾸기">✎ 항목 이름${nax?" ●":""}</button>`)
         +`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px"><span style="font-size:11.5px;color:var(--muted)">브랜드</span>${bopts.map(b=>{const on=(x.brands||[]).includes(b);return `<label class="bchip${on?" on":""}"><input type="checkbox" data-bi="${i}" data-bn="${esc(b)}" ${on?"checked":""}> ${esc(b)}</label>`;}).join("")}<span style="font-size:11px;color:var(--faint)">둘 이상 고르면 공통 메뉴</span></div>`
         +`<div class="erow" style="grid-template-columns:1.2fr 1fr 38px"><input value="${esc(x.name)}" data-i="${i}" data-k="name" placeholder="제품명"><input value="${esc(x.tag)}" data-i="${i}" data-k="tag" placeholder="태그(예: 칼국수·기본)"><button class="del" data-i="${i}">×</button></div>`;
     }else{
@@ -1249,7 +1286,7 @@ function renderItemRows(skipAxis){
       if(x.type==="module") bl+=`<label style="font-size:11.5px;color:var(--muted);display:block;margin-top:7px"><input type="checkbox" style="width:auto;margin:0 4px 0 0;vertical-align:-2px" data-i="${i}" data-k="modtext" ${x.input==="text"?"checked":""}> 자유입력(직접 추천)으로 받기</label>`;
       if(x.type==="price"||x.type==="choice"||x.type==="imgchoice") bl+=`<label style="font-size:11.5px;color:var(--muted);display:block;margin-top:7px"><input type="checkbox" style="width:auto;margin:0 4px 0 0;vertical-align:-2px" data-i="${i}" data-k="req" ${x.req!==false?"checked":""}> 필수 응답 <span style="color:var(--faint)">(끄면 건너뛸 수 있음)</span></label><label style="font-size:11.5px;color:var(--muted);display:block;margin-top:5px"><input type="checkbox" style="width:auto;margin:0 4px 0 0;vertical-align:-2px" data-i="${i}" data-k="pin" ${x.pin?"checked":""}> 결과 맨 위에 1위 강조 <span style="color:var(--faint)">(예: 출시 조합 투표)</span></label>`;
     }
-    return `<div style="border:1px solid var(--line);border-radius:9px;padding:10px;margin-bottom:8px">${bl}</div>`;}).join("");
+    return `<div data-ci="${i}" style="border:1px solid var(--line);border-radius:9px;padding:10px;margin-bottom:8px">${bl}</div>`;}).join("");
   el.innerHTML=h;
   el.querySelectorAll("[data-k]").forEach(inp=>{if(inp.dataset.k==="imglabel")return;const ev=(inp.tagName==="SELECT"||inp.type==="checkbox")?"onchange":"oninput";
     inp[ev]=e=>{const x=ed.items[+e.target.dataset.i],k=e.target.dataset.k; if(!x)return;
@@ -1270,6 +1307,8 @@ function renderItemRows(skipAxis){
     if(c.checked) set.add(bn); else set.delete(bn);
     x.brands=bopts.filter(b=>set.has(b)).concat([...set].filter(b=>!bopts.includes(b)));
     renderItemRows(true); schedulePreview(); });
+  el.querySelectorAll("[data-axclear]").forEach(b=>b.onclick=()=>{ if(axisLockInfo().locked){ alert("응답이 있는 회차라 바꿀 수 없어요."); return; }
+    const q=edProds().find(p=>p.uid===b.dataset.axclear); if(!q) return; q.axov={}; q.tasteN=null; renderItemRows(); schedulePreview(); });
   el.querySelectorAll("[data-axp]").forEach(b=>b.onclick=()=>{ ed.axT="p:"+b.dataset.axp; renderAxisRows(); const w=$("ed_axes_wrap"); if(w) w.scrollIntoView({behavior:"smooth",block:"start"}); });
   el.querySelectorAll("[data-addimg]").forEach(b=>b.onclick=()=>{const x=ed.items[+b.dataset.addimg];(x.imgopts=x.imgopts||[]).push({label:"",image:""});renderImgOpts(+b.dataset.addimg);});
   el.querySelectorAll(".del").forEach(b=>b.onclick=()=>{ed.items.splice(+b.dataset.i,1);renderItemRows();});
@@ -1329,8 +1368,10 @@ function buildDraftCfg(){
     // 브랜드별 이름 — 제품이 있는 브랜드만, 실제 축 key 에 대해서만, 공통과 다른 값만 저장한다
     const ba={}; const keys=cfg.axes.map(a=>a.key);
     axBrands().forEach(br=>{ const m=(ed.brandAxes||{})[br]; if(!m) return; const o={};
-      keys.forEach(k=>{ const v=m[k]; if(!v) return; const ca=cfg.axes.find(a=>a.key===k); const L=(v.label||"").trim()||ca.label, H=(v.hint||"").trim();
-        if(L===ca.label&&H===(ca.hint||"")) return; o[k]={label:L,hint:H}; });
+      keys.forEach(k=>{ const v=m[k]; if(!v) return; const ca=cfg.axes.find(a=>a.key===k); const e={};
+        const Lc=(v.label||"").trim(), Hc=(v.hint!=null)?(v.hint||"").trim():null;
+        if(Lc&&Lc!==ca.label) e.label=Lc; if(Hc!==null&&Hc!==(ca.hint||"")) e.hint=Hc; // 이름·설명을 칸 단위로 따로 — 바꾸지 않은 쪽은 공통을 계속 따른다
+        if(Object.keys(e).length) o[k]=e; });
       if(Object.keys(o).length) ba[br]=o; });
     if(Object.keys(ba).length) cfg.meta.brandAxes=ba; else delete cfg.meta.brandAxes;
     // 제품별 이름 — 기준(공통 또는 단독 브랜드의 이름)과 다른 값만 저장한다. 제품 이름(name)이 키
@@ -1339,8 +1380,9 @@ function buildDraftCfg(){
       const brs=(x.brands&&x.brands.length)?x.brands:[x.brand].filter(Boolean); const bo=brs.length===1?((cfg.meta.brandAxes||{})[brs[0]]||{}):{}; const o={};
       keys.forEach(k=>{ const v=x.axov[k]; if(!v) return; const ca=cfg.axes.find(a=>a.key===k); const b0=bo[k];
         const baseL=(b0&&b0.label)||ca.label, baseH=(b0&&b0.hint!=null)?b0.hint:(ca.hint||"");
-        const L=(v.label||"").trim()||baseL, H=(v.hint||"").trim();
-        if(L===baseL&&H===baseH) return; o[k]={label:L,hint:H}; });
+        const e={}; const Lc=(v.label||"").trim(), Hc=(v.hint!=null)?(v.hint||"").trim():null;
+        if(Lc&&Lc!==baseL) e.label=Lc; if(Hc!==null&&Hc!==baseH) e.hint=Hc;
+        if(Object.keys(e).length) o[k]=e; });
       if(Object.keys(o).length) pa[x.name]=o; });
     if(Object.keys(pa).length) cfg.meta.productAxes=pa; else delete cfg.meta.productAxes;
     // 제품별 맛 칸 수 — 회차 기본과 다른 값만 저장
