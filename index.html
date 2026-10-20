@@ -561,15 +561,17 @@ function pickBlocks(){return CFG.blocks.filter(b=>(b.type==="price"||b.type==="c
 /* 구분 제목(section)의 소속 브랜드 — 지정하면 브랜드별 화면 필터·PDF 에 그 구역의 투표가 포함된다. 비우면 공통 */
 function secBrandsOf(sec){ return (sec&&Array.isArray(sec.brands))?sec.brands:[]; }
 /* 투표 문항의 소속(브랜드) 판정 — 결과 화면 필터·브랜드별 PDF 가 같은 규칙을 쓴다.
-   ① 구분 제목에 브랜드를 지정했으면 그 브랜드 ② 아니면 바로 앞 제품을 따른다(구분 제목을 만나기 전까지: 제품 → 그 뒤 문항들) ③ 그 외는 공통(owners 비어 있음) */
-function pickWithSec(){ const out=[]; let cur=null, lastProd=null;
+   규칙은 하나: **바로 앞에 있는 제품 또는 구분 제목**이 소속을 정한다.
+   ① 바로 앞이 제품이면 그 제품의 브랜드(공통 메뉴면 여러 브랜드) ② 바로 앞이 구분 제목이면 그 제목에 지정한 브랜드(지정이 없으면 공통) ③ 아무것도 없으면(맨 앞) 공통 */
+function pickWithSec(){ const out=[]; let cur=null, ctx=null; // cur: 직전 구분 제목(묶음 표시용), ctx: 직전 제품 또는 구분 제목
   (CFG.blocks||[]).forEach(b=>{
-    if(b.type==="section"){cur=b;lastProd=null;return;}          // 구분 제목을 만나면 제품 연결이 끊긴다
-    if(b.type==="product"){lastProd=b;return;}
+    if(b.type==="section"){cur=b;ctx=b;return;}
+    if(b.type==="product"){ctx=b;return;}
     if(b.type==="price"||b.type==="choice"||b.type==="imgchoice"||(b.type==="module"&&b.opts&&b.opts.length)){
-      const sb2=secBrandsOf(cur); let owners=[], via="";
-      if(sb2.length){owners=sb2;via="section";} else if(lastProd){owners=prodBrands(lastProd).slice();via="product";}
-      out.push({b,sec:cur,owners,via,prod:via==="product"?lastProd:null}); } });
+      let owners=[], via="";
+      if(ctx&&ctx.type==="product"){owners=prodBrands(ctx).slice();via="product";}
+      else if(ctx&&ctx.type==="section"&&secBrandsOf(ctx).length){owners=secBrandsOf(ctx).slice();via="section";}
+      out.push({b,sec:cur,owners,via,prod:via==="product"?ctx:null}); } });
   return out; }
 function ownerOk(x){ return dstate.brand==="전체"||!x.owners.length||x.owners.includes(dstate.brand); }
 /* "결과 맨 위에 1위 강조"(pin) 문항의 한 줄 요약 */
@@ -918,79 +920,100 @@ function _openReport(){
   const brands=[];
   CFG.blocks.filter(b=>b.type==="product").forEach(b=>prodBrands(b).forEach(n=>{if(n&&!brands.includes(n)&&evA.some(e=>inBrand(e,n)))brands.push(n);}));
   evA.forEach(e=>prodBrands(e).forEach(n=>{if(n&&!brands.includes(n))brands.push(n);}));
-  const multi=HASP&&brands.length>=2;
-  const kpiHtml=(evx,rowsx)=>{const rk=rankOf(evx);return `<div class="kpis"><div class="kpi"><b>${rowsx.length}명</b><span>응답</span></div><div class="kpi"><b>${rk.length}종</b><span>평가 제품</span></div><div class="kpi"><b>${rk.length?f1(rk[0].taste):"-"}/5</b><span>맛 · ${rk.length?esc(rk[0].name):"-"}</span></div><div class="kpi"><b>${rk.length?f1(rk[0].sensory):"-"}/5</b><span>관능 · ${rk.length?esc(rk[0].name):"-"}</span></div></div>`;};
+  /* ── 메뉴 묶음(구역): 같은 브랜드 조합으로 파는 제품끼리 한 구역. 같은 제품·같은 투표는 한 구역에만 나온다.
+        공통 메뉴(브랜드 2개 이상) → 그 외 단독 브랜드 순. 투표는 소속(구분 제목 브랜드 → 바로 앞 제품)이 같은 구역에 붙는다 ── */
+  const picksS=pickWithSec();
+  const cfgIdx=(()=>{const m={};CFG.blocks.filter(b=>b.type==="product").forEach((b,i)=>{m[b.name]=i;});return nm=>(nm in m)?m[nm]:999;})();
+  const keyOf=a=>[...new Set(a)].sort().join("+");
+  const gmap=new Map();
+  const gget=(brs,idx)=>{const k=keyOf(brs);let g=gmap.get(k);if(!g){g={key:k,brands:[...new Set(brs)],names:[],votes:[],idx};gmap.set(k,g);}else if(idx<g.idx)g.idx=idx;return g;};
+  if(HASP){
+    [...new Set(evA.map(e=>e.name))].forEach(nm=>{const e=evA.find(x=>x.name===nm);const bs=prodBrands(e);gget(bs.length?bs:[e.brand||""],cfgIdx(nm)).names.push(nm);});
+    picksS.forEach((x,i)=>{if(x.owners.length) gget(x.owners,500+i).votes.push(x);});
+  }
+  const groups=[...gmap.values()].sort((a,b)=>(b.brands.length-a.brands.length)||(a.idx-b.idx));
+  const commonList=picksS.filter(x=>!x.owners.length);
+  const grouped=HASP&&groups.length>1;                       // 구역이 둘 이상일 때만 구역별로 나눈다(하나면 예전처럼 한 덩어리)
+  const brandViews=grouped?brands.filter(b=>groups.some(g=>g.brands.includes(b))):[];
+  const dots=g=>g.brands.map(b=>`<span style="color:${esc(brandColor(b))}">●</span>`).join("");
+  const gTitle=g=>g.names.length?(g.brands.length>1?`공통 메뉴 · ${g.brands.join(" · ")}`:`${g.brands[0]} 전용`):(g.brands.length>1?`공통 투표 · ${g.brands.join(" · ")}`:`${g.brands[0]} 관련 투표`);
+  const kpiHtml=(rk,n)=>`<div class="kpis"><div class="kpi"><b>${n}명</b><span>응답</span></div><div class="kpi"><b>${rk.length}종</b><span>평가 제품</span></div><div class="kpi"><b>${rk.length?f1(rk[0].taste):"-"}/5</b><span>맛 · 1위 ${rk.length?esc(rk[0].name):"-"}</span></div><div class="kpi"><b>${rk.length?f1(rk[0].sensory):"-"}/5</b><span>관능 · 1위 ${rk.length?esc(rk[0].name):"-"}</span></div></div>`;
   const rankTable=(rk,withBrand)=>`<table><tr><th class="l">제품</th>${withBrand?"<th>브랜드</th>":""}<th>맛</th><th>관능</th><th>표본</th><th>판정</th></tr>${rk.map(x=>`<tr><td class="l">${esc(x.name)}${splitTag(x.name)?`<br><small style="color:#c1553a">${splitTag(x.name)}</small>`:""}</td>${withBrand?`<td>${esc(x.brand||"")}</td>`:""}<td>${f1(x.taste)}</td><td>${f1(x.sensory)}</td><td>${x.n}</td><td>${sigTxt(x.taste,x.sensory,x.n)}</td></tr>`).join("")}</table>`;
   const AL=axisLabels();
   const rule=`<p class="note">※ ${AL.taste} ${TASTE_MIN} 이상 그리고 ${AL.sensory} ${SENSORY_MIN} 이상이면 다음 단계 진행 판정입니다. 표본 ${MIN_SAMPLE}명 미만은 표본 부족으로 표시됩니다.</p>`;
-  /* 제품별 항목 평균 — 항목 이름 구성이 같은 제품끼리 한 표로 묶는다(이름이 다르면 표가 나뉨) */
+  const verdictLine=rk=>{const order=["다음 단계 진행","맛 보강","관능 수정","맛·관능 보강","표본 부족"],c={};rk.forEach(x=>{const t=verdictOf(x.taste,x.sensory,x.n).text;c[t]=(c[t]||0)+1;});
+    const parts=order.filter(t=>c[t]).map(t=>`${t} ${c[t]}종`);return parts.length?`<p class="vsum"><b>판정 요약</b> · ${parts.join(" · ")}</p>`:"";};
+  const compoLine=gs=>grouped?`<p class="compo"><b>구성</b> · ${gs.filter(g=>g.names.length).map(g=>`${g.brands.length>1?"공통 메뉴":esc(g.brands[0])+" 전용"} ${g.names.length}종 (${g.names.map(esc).join(" · ")})`).join(" / ")}</p>`:"";
+  /* 제품별 항목 평균 — 항목 이름 구성이 같은 제품끼리 한 표로 묶고, 제품 이름 아래에 맛·관능·판정을 작게 붙여 이 표만 봐도 결론이 보이게 한다 */
   const axisTable=rk=>{const gs=[];rk.forEach(x=>{const ax=axesForProd(CFG,x.pe[0]||{});const sig=ax.map(a=>a.label+(axisGroup(a)==="taste"?"•":"")).join("|");let g=gs.find(y=>y.sig===sig);if(!g){g={sig,axes:ax,rows:[]};gs.push(g);}g.rows.push(x);});
-    return gs.map(g=>`<table><tr><th class="l">제품</th>${g.axes.map(a=>`<th>${esc(a.label)}<br><small>${axisGroup(a)==="taste"?"맛":"관능"}</small></th>`).join("")}</tr>${g.rows.map(x=>`<tr><td class="l">${esc(x.name)}</td>${g.axes.map(a=>{const vals=x.pe.map(e=>e.s[a.key]).filter(v=>typeof v==="number");return `<td>${vals.length?f1(avg(vals)):"–"}</td>`;}).join("")}</tr>`).join("")}</table>`).join("");};
-  /* 투표 집계 — 구분 제목(소속 브랜드 포함) 단위로 묶어 출력. 브랜드 페이지에는 그 브랜드 소속 구역 + 공통(소속 없음) 구역을 넣는다 */
-  const picksS=pickWithSec();
-  const tallyHtmlOf=(list,mode)=>{let h="",last;list.forEach(x=>{const {b,sec}=x;
+    return gs.map(g=>`<table><tr><th class="l">제품</th>${g.axes.map(a=>`<th>${esc(a.label)}<br><small>${axisGroup(a)==="taste"?"맛":"관능"}</small></th>`).join("")}</tr>${g.rows.map(x=>`<tr><td class="l"><b>${esc(x.name)}</b>${splitTag(x.name)?` <small style="color:#c1553a">${splitTag(x.name)}</small>`:""}<br><small class="vd">맛 ${f1(x.taste)} · 관능 ${f1(x.sensory)} · ${sigTxt(x.taste,x.sensory,x.n)}</small></td>${g.axes.map(a=>{const vals=x.pe.map(e=>e.s[a.key]).filter(v=>typeof v==="number");return `<td>${vals.length?f1(avg(vals)):"–"}</td>`;}).join("")}</tr>`).join("")}</table>`).join("");};
+  /* 투표 집계 — 구분 제목 단위로 묶어 출력. 모든 표에 "응답 N명 기준"을 붙인다 */
+  const tallyHtmlOf=list=>{let h="",last;list.forEach(x=>{const {b,sec}=x;
     if(sec!==last){last=sec;if(sec&&(sec.label||sec.text)){const sbs=secBrandsOf(sec);h+=`<div class="secbar"><b>${esc(sec.label||"")}</b>${sbs.length?` <span>[${esc(sbs.join("·"))}]</span>`:""}${sec.text?` <span>${esc(sec.text)}</span>`:""}</div>`;}}
     const opts=(b.opts||[]).map(o=>b.type==="imgchoice"?o.label:o);const counts=opts.map(o=>ROWS.filter(r=>(r.extras||{})[b.q]===o).length);const tot0=counts.reduce((a,c)=>a+c,0),tot=tot0||1;
-    const showOwner=x.owners.length&&(mode==="all"||x.owners.length>1); // 브랜드 페이지에서는 두 브랜드 이상에 걸친 투표만 소속을 표시
-    h+=`<div class="vq" style="margin-bottom:8px"><b style="font-size:12.5px">${esc(b.label)}</b>${showOwner?` <span style="color:#c1553a;font-size:11px">[${esc(x.owners.join("·"))}${x.owners.length>1?" 공통":""}]</span>`:""} <span style="color:#6f6b64;font-size:11px">· 응답 ${tot0}명 기준</span><table style="margin-top:3px"><tr>${opts.map(o=>`<th>${esc(o)}</th>`).join("")}</tr><tr>${counts.map(c=>`<td>${c}표 (${Math.round(c/tot*100)}%)</td>`).join("")}</tr></table></div>`;});return h;};
+    h+=`<div class="vq" style="margin-bottom:8px"><b style="font-size:12.5px">${esc(b.label)}</b> <span style="color:#6f6b64;font-size:11px">· 응답 ${tot0}명 기준</span><table style="margin-top:3px"><tr>${opts.map(o=>`<th>${esc(o)}</th>`).join("")}</tr><tr>${counts.map(c=>`<td>${c}표 (${Math.round(c/tot*100)}%)</td>`).join("")}</tr></table></div>`;});return h;};
   const pinsHtmlOf=list=>{const l=list.filter(x=>x.b.pin).map(x=>pinLine(x.b,ROWS)).filter(Boolean);return l.length?`<div class="pinbox">${l.join("<br>")}</div>`:"";};
+  const summaryHtml=(evx,n,pickList,gs)=>{const rk=rankOf(evx);return kpiHtml(rk,n)+compoLine(gs)+verdictLine(rk)+pinsHtmlOf(pickList)+`<h2>제품 랭킹 · 출시 판정</h2>`+rankTable(rk,true)+rule;};
   const title=CFG.meta.title||slug;
   let html=`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${esc(title)} 결과 보고서</title>
   <style>*{box-sizing:border-box}body{font-family:'Malgun Gothic','맑은 고딕',system-ui,sans-serif;color:#1d1b18;margin:0;padding:30px 38px;font-size:13px;line-height:1.5}
   h1{font-size:21px;margin:0 0 2px}.sub{color:#6f6b64;font-size:12px;margin-bottom:16px}
   h2{font-size:15px;margin:20px 0 8px;border-bottom:2px solid #1d1b18;padding-bottom:4px}
-  h2.bh{font-size:17px;border-bottom:3px solid #c1553a;margin-top:6px}.note{font-size:11px;color:#6f6b64;margin:-2px 0 8px}
-  table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:6px}th,td{border:1px solid #d4d0c8;padding:6px 8px;text-align:center}th{background:#f4f2ee}th small{font-weight:400;color:#8a857d}td.l,th.l{text-align:left}
+  h2.gh{font-size:16.5px;border-bottom:3px solid #c1553a;margin:26px 0 6px}
+  h3{font-size:12.8px;margin:12px 0 5px;color:#3a3732}h3 small{font-weight:400;color:#8a857d}
+  .gl{margin:0 0 4px;color:#6f6b64;font-size:12px}.compo,.vsum{margin:4px 0;font-size:12.5px}.vtag{margin:0 0 6px;font-size:12px;color:#6f6b64}.note{font-size:11px;color:#6f6b64;margin:-2px 0 8px}
+  table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:6px}th,td{border:1px solid #d4d0c8;padding:6px 8px;text-align:center}th{background:#f4f2ee}th small{font-weight:400;color:#8a857d}td.l,th.l{text-align:left}td.l small.vd{font-weight:400;color:#6f6b64;font-size:10.5px}
   .op{border-left:3px solid #c1553a;padding:4px 10px;margin:6px 0;font-size:12px;background:#faf9f7}.op .m{color:#9a958d;font-size:10.5px}
   .toolbar{position:fixed;top:10px;right:14px;display:flex;gap:8px;align-items:center}.toolbar button{background:#c1553a;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:13px;cursor:pointer}
   .toolbar select{border:1px solid #c9c4ba;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;background:#fff}
   .kpis{display:flex;gap:10px;margin-bottom:6px;flex-wrap:wrap}.kpi{border:1px solid #d4d0c8;border-radius:8px;padding:8px 14px;min-width:110px}.kpi b{font-size:19px;display:block}.kpi span{color:#6f6b64;font-size:11px}
   .secbar{margin:12px 0 6px;padding:5px 10px;border-left:4px solid #c1553a;background:#f4f2ee;font-size:12.5px}.secbar span{color:#6f6b64;font-size:11.5px}
   .pinbox{border:1px solid #c1553a;background:#fbf3ef;border-radius:8px;padding:8px 12px;margin:8px 0;font-size:12.5px;line-height:1.7}
-  .bsec{break-inside:avoid;page-break-inside:avoid}.bsec + .bsec{page-break-before:always;break-before:page}.bsec.nobreak{page-break-before:auto;break-before:auto}
-  @media screen{.bsec + .bsec:not(.nobreak)::before{content:"── PDF 로 저장하면 여기서 새 페이지가 시작됩니다 ──";display:block;margin:30px 0 14px;padding:6px 0;border-top:2px dashed #c9c4ba;text-align:center;font-size:11px;color:#9a958d}}
-  .vq{break-inside:avoid;page-break-inside:avoid}
+  .grp,.vq,.ops{break-inside:avoid;page-break-inside:avoid}
   @media print{.toolbar{display:none}body{padding:0;font-size:11.5px;line-height:1.4}
-    h1{font-size:19px}.sub{margin-bottom:10px}h2{margin:12px 0 6px;font-size:13.5px}h2.bh{font-size:15.5px}
+    h1{font-size:19px}.sub{margin-bottom:10px}h2{margin:12px 0 6px;font-size:13.5px}h2.gh{font-size:15px;margin:16px 0 5px}h3{margin:8px 0 4px}
     table{font-size:11px;margin-bottom:4px}th,td{padding:3px 6px}
     .kpis{gap:6px;margin-bottom:4px}.kpi{padding:5px 10px;min-width:90px}.kpi b{font-size:16px}
-    table,tr,.kpis,.pinbox,.op,.secbar{break-inside:avoid;page-break-inside:avoid}
-    h2,.secbar{break-after:avoid;page-break-after:avoid}}</style></head><body>
-  <div class="toolbar">${multi?`<select id="vsel" aria-label="보고서 범위"><option value="__all">전체 (브랜드별 페이지 나눔)</option>${brands.map((b,i)=>`<option value="b${i}">${esc(b)}만</option>`).join("")}${(tblocks.length||ops.length)?`<option value="__common">투표·의견만</option>`:""}</select>`:""}<button onclick="window.print()">🖨 인쇄 / PDF 저장</button></div>
+    table,tr,.kpis,.pinbox,.op,.secbar,.compo,.vsum{break-inside:avoid;page-break-inside:avoid}
+    h2,h3,.secbar,.gl{break-after:avoid;page-break-after:avoid}}</style></head><body>
+  <div class="toolbar">${grouped?`<select id="vsel" aria-label="보고서 범위"><option value="__all">전체 (요약 + 메뉴 묶음별)</option>${brandViews.map((b,i)=>`<option value="b${i}">${esc(b)} 관련</option>`).join("")}${(tblocks.length||ops.length)?`<option value="__common">투표·의견만</option>`:""}</select>`:""}<button onclick="window.print()">🖨 인쇄 / PDF 저장</button></div>
   <h1>${esc(title)} — ${HASP?"시식 평가":"투표"} 결과 보고서<span id="bt"></span></h1>
   <div class="sub">회차: ${esc(slug)} · 응답자 ${ROWS.length}명 · 생성 ${esc(new Date().toLocaleString('ko-KR'))}</div>
   `;
+  const bAttr=(fn)=>brandViews.map((b,i)=>fn(b)?" b"+i:"").join("");
   if(HASP){
-    html+=`<div data-v="__all">${kpiHtml(evA,ROWS)}${pinsHtmlOf(picksS)}<h2>제품 랭킹 · 출시 판정${multi?" (전 브랜드)":""}</h2>${rankTable(rankOf(evA),true)}${rule}</div>`;
-    if(multi) brands.forEach((b,i)=>{
-      const eb=evA.filter(e=>inBrand(e,b)), ebn=new Set(eb.map(e=>e.name)), rb=ROWS.filter(r=>(r.items||[]).some(it=>ebn.has(it.name))), rk=rankOf(eb);
-      const bl=picksS.filter(x=>x.owners.includes(b)); // 이 브랜드 소속 투표만(공통 투표는 전체 보고서에 한 번만)
-      html+=`<div class="bsec" data-v="__all b${i}"><h2 class="bh"><span style="color:${esc(brandColor(b))}">●</span> ${esc(b)}</h2>${kpiHtml(eb,rb)}${pinsHtmlOf(bl)}
-        <h2>제품 랭킹 · 출시 판정</h2>${rankTable(rk,false)}${rule}
-        <h2>제품별 항목 평균</h2>${axisTable(rk)}
-        ${bl.length?`<h2>선택 · 투표 집계 (${esc(b)} 관련)</h2>${tallyHtmlOf(bl,"brand")}`:""}${picksS.some(x=>!x.owners.length)?`<p class="note">※ 전 메뉴 공통 질문은 응답자 전체 기준이라 브랜드 보고서에 넣지 않았습니다. 「전체」 보고서 또는 「투표·의견만」에서 확인하세요.</p>`:""}
-        ${ASKP?`<h2>응답자 구성 (${esc(b)} 평가자)</h2>${segTable(rb)}`:""}</div>`;
+    html+=`<div data-v="__all">${summaryHtml(evA,ROWS.length,picksS,groups)}</div>`;
+    brandViews.forEach((b,i)=>{
+      const eb=evA.filter(e=>inBrand(e,b)), ebn=new Set(eb.map(e=>e.name)), rb=ROWS.filter(r=>(r.items||[]).some(it=>ebn.has(it.name))), gs=groups.filter(g=>g.brands.includes(b));
+      html+=`<div data-v="b${i}"><p class="vtag"><span style="color:${esc(brandColor(b))}">●</span> <b>${esc(b)} 관련 보고서</b> — 전체 보고서에서 다른 브랜드 전용 구역만 뺀 것입니다. 공통 메뉴는 다른 브랜드 보고서에도 똑같이 들어갑니다.</p>${summaryHtml(eb,rb.length,picksS.filter(x=>!x.owners.length||x.owners.includes(b)),gs)}</div>`;
     });
-    else html+=`<div data-v="__all"><h2>제품별 항목 평균</h2>${axisTable(rankOf(evA))}</div>`;
+    if(grouped){
+      html+=`<div data-v="__common">${pinsHtmlOf(picksS)}</div>`;
+      groups.forEach(g=>{
+        const evg=evA.filter(e=>g.names.includes(e.name)), rk=rankOf(evg), vq=g.votes.length?tallyHtmlOf(g.votes):"", vis="__all"+bAttr(b=>g.brands.includes(b));
+        html+=`<div class="grp" data-v="${vis}"><h2 class="gh">${dots(g)} ${esc(gTitle(g))}</h2>${g.names.length?`<p class="gl">${g.names.map(esc).join(" · ")}</p><h3>제품별 항목 평균</h3>${axisTable(rk)}`:""}${vq?`<h3>${g.names.length?"이 메뉴에 대한 투표":"투표"} <small>· 응답자 전체 기준</small></h3>${vq}`:""}</div>`;
+        if(vq) html+=`<div class="grp" data-v="__common"><h2 class="gh">${dots(g)} ${esc(gTitle(g))}${g.names.length?" · 투표":""}</h2>${tallyHtmlOf(g.votes)}</div>`;
+      });
+      if(commonList.length) html+=`<div data-v="__all${bAttr(()=>true)} __common"><h2>선택 · 투표 집계 (공통 문항 · 응답자 전체 기준)</h2>${tallyHtmlOf(commonList)}</div>`;
+    }else{
+      html+=`<div data-v="__all"><h2>제품별 항목 평균</h2>${axisTable(rankOf(evA))}</div>`;
+    }
   }
-  /* 전체 보고서: 브랜드 페이지에 이미 나온 소속 투표는 반복하지 않고 공통 투표만(브랜드 페이지가 없으면 전부). 「투표·의견만」은 전부 */
-  const commonList=picksS.filter(x=>!x.owners.length), forAll=multi?commonList:picksS;
   let head="";
   if(!HASP) head=`<div class="kpis"><div class="kpi"><b>${ROWS.length}명</b><span>총 응답</span></div><div class="kpi"><b>${tblocks.length}개</b><span>투표 문항</span></div><div class="kpi"><b>${ops.length}건</b><span>자유 의견</span></div></div>`;
-  let tail="";
-  if(ASKP) tail+=`<h2>응답자 구성</h2>${segTable(ROWS)}`;
-  if(ops.length){tail+=`<h2>종합 의견 (${ops.length}건)</h2>`+ops.slice(0,40).map(o=>`<div class="op">${esc(o.t)}<div class="m">${esc(o.meta)}</div></div>`).join("");}
-  const tl=(list,ttl,mode)=>list.length?`<h2>${ttl}</h2>`+tallyHtmlOf(list,mode):"";
-  html+=`<div data-v="__all">${head}${tl(forAll,multi?"선택 · 투표 집계 (공통 문항 · 응답자 전체 기준)":"선택 · 투표 집계","all")}${tail}</div>`;
-  html+=`<div data-v="__common">${head}${tl(picksS,"선택 · 투표 집계 (전체)","all")}${tail}</div>`;
+  if(!grouped) html+=`<div data-v="__all __common">${head}${picksS.length?`<h2>선택 · 투표 집계</h2>${tallyHtmlOf(picksS)}`:""}</div>`;
+  if(ASKP){
+    html+=`<div data-v="__all __common"><h2>응답자 구성</h2>${segTable(ROWS)}</div>`;
+    brandViews.forEach((b,i)=>{const ebn=new Set(evA.filter(e=>inBrand(e,b)).map(e=>e.name)); const rb=ROWS.filter(r=>(r.items||[]).some(it=>ebn.has(it.name))); html+=`<div data-v="b${i}"><h2>응답자 구성 (${esc(b)} 관련 메뉴 평가자 ${rb.length}명)</h2>${segTable(rb)}</div>`;});
+  }
+  if(ops.length) html+=`<div class="ops" data-v="__all${bAttr(()=>true)} __common"><h2>종합 의견 (${ops.length}건)</h2>${ops.slice(0,40).map(o=>`<div class="op">${esc(o.t)}<div class="m">${esc(o.meta)}</div></div>`).join("")}</div>`;
   html+=`<script>
-  var T=${JSON.stringify(title).replace(/</g,"\\u003c")},B=${JSON.stringify(brands).replace(/</g,"\\u003c")};
+  var T=${JSON.stringify(title).replace(/</g,"\\u003c")},B=${JSON.stringify(brandViews).replace(/</g,"\\u003c")};
   function show(v){
     document.querySelectorAll("[data-v]").forEach(function(e){e.style.display=(" "+e.getAttribute("data-v")+" ").indexOf(" "+v+" ")>=0?"":"none";});
-    document.querySelectorAll(".bsec").forEach(function(e){e.classList.toggle("nobreak",v!=="__all");});
     var i=/^b(\\d+)$/.test(v)?+v.slice(1):-1, bt=document.getElementById("bt");
-    bt.textContent=i>=0?" · "+B[i]:(v==="__common"?" · 투표·의견":"");
-    document.title=T+(i>=0?"_"+B[i]:(v==="__common"?"_투표·의견":""))+"_결과보고서"; // PDF 저장 시 기본 파일명
+    bt.textContent=i>=0?" · "+B[i]+" 관련":(v==="__common"?" · 투표·의견":"");
+    document.title=T+(i>=0?"_"+B[i]+"관련":(v==="__common"?"_투표·의견":""))+"_결과보고서"; // PDF 저장 시 기본 파일명
   }
   var s=document.getElementById("vsel"); if(s) s.onchange=function(){show(s.value);}; show("__all");
   <\/script></body></html>`;
@@ -1240,7 +1263,7 @@ function renderEditor(){
   h+=`<div class="fld"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="ed_rubric" ${ed.showRubric?'checked':''} style="width:auto;margin:0"> 점수 기준 보기 표시 <span style="color:var(--faint);font-weight:400;font-size:11px">(껐다 켰다 가능 · 응답 폼 상단 안내)</span></label></div>`;
   h+=`<div class="fld"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="ed_ask" ${ed.askProfile?"checked":""} style="width:auto;margin:0"> 응답자 정보(성별·연령) 받기 <span style="color:var(--faint);font-weight:400;font-size:11px">(끄면 완전 익명 — 사내 투표처럼 소수가 응답할 때 권장)</span></label></div>`;
   if(edProds().length) h+=`<p style="font-size:11.5px;color:var(--faint);margin:0 0 12px">브랜드는 위 <b>브랜드 관리</b>에서 등록하면 아래 제품의 브랜드 목록에 자동으로 나타납니다.</p>`;
-  h+=`<div class="fld"><label>구성 <span style="color:var(--faint)">(위에서 아래 순서대로 응답자에게 보여요 · ▲▼로 순서 변경 · 제품은 평가 항목이 자동으로 붙고, 제품이 하나도 없으면 <b>투표 설문</b>)</span></label><div id="ed_items"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="addbtn" id="addProduct">+ 제품</button><button class="addbtn" id="addExtra">+ 문항</button></div><p style="font-size:11.5px;color:var(--faint);margin:6px 0 0">문항 = 선택 투표 · 사진 투표 · 자유 의견. 제품 이름은 서로 달라야 합니다(같은 이름이면 점수가 섞여요).<br>💡 <b>제품 바로 뒤에 둔 투표 문항은 그 제품(의 브랜드) 투표</b>로 취급돼 브랜드별 결과·PDF 에 그 브랜드로 들어가요. 전체에 대한 질문은 <b>구분 제목</b>으로 끊어 주세요.</p></div>`;
+  h+=`<div class="fld"><label>구성 <span style="color:var(--faint)">(위에서 아래 순서대로 응답자에게 보여요 · ▲▼로 순서 변경 · 제품은 평가 항목이 자동으로 붙고, 제품이 하나도 없으면 <b>투표 설문</b>)</span></label><div id="ed_items"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="addbtn" id="addProduct">+ 제품</button><button class="addbtn" id="addExtra">+ 문항</button></div><p style="font-size:11.5px;color:var(--faint);margin:6px 0 0">문항 = 선택 투표 · 사진 투표 · 자유 의견. 제품 이름은 서로 달라야 합니다(같은 이름이면 점수가 섞여요).<br>💡 투표 문항의 소속은 <b>바로 앞에 있는 제품(또는 구분 제목)</b>이 정해요. 제품 바로 뒤 문항은 그 제품(의 브랜드) 투표로 결과·PDF 의 해당 메뉴 구역에 들어가고, 전체에 대한 질문은 <b>구분 제목</b>으로 끊어 주세요(공통 질문).</p></div>`;
   h+=`<div class="fld" id="ed_axes_wrap"></div>`;
   h+=`<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="abtn primary" id="edSaveAct">저장 &amp; 응답 폼에 활성화</button><button class="abtn" id="edSave">저장만</button></div></div>`;
   el.innerHTML=`<div class="ed-split"><div class="ed-main">${h}</div><aside class="ed-prev">${prevHtml}</aside></div>`;
