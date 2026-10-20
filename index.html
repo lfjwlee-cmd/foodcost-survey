@@ -450,7 +450,7 @@ try{ if(sessionStorage.getItem("svy_unlocked")==="1"){ unlocked=true; } }catch(e
 
 /* ===== DASHBOARD ===== */
 let ROWS=[],timer=null,dashStarted=false,viewSlug=null;
-const dstate={brand:"전체",age:"전체",gender:"전체",product:0};
+const dstate={brand:"전체",age:"전체",gender:"전체",product:0,heat:"product"};
 async function startDash(){
   $("lockPanel").classList.add("hidden");$("dash").classList.remove("hidden");
   if(!sb){$("cfgBanner").style.display="block";}
@@ -520,8 +520,8 @@ function _renderDash(){
     dh+=`<section class="card block"><h2 style="margin-bottom:12px">제품 상세</h2><div class="prod-picker" id="prodPicker"></div>
       <div class="grid g2"><div><p class="cap" style="margin-bottom:2px">관능 프로필</p><div class="radar-wrap"><svg id="radar" width="300" height="240" viewBox="0 0 300 240"></svg></div><div class="radar-legend" id="radarLegend"></div></div>
       <div id="votes"></div></div></section>
-      <div class="grid g2 block"><div class="card"><h2>🚦 제품 랭킹 · 출시 판정</h2><p class="cap" id="rankCap">맛·관능 기준</p><div style="overflow-x:auto"><table id="rankTable"></table></div></div>
-      <div class="card"><h2>🔥 세그먼트 × 맛 히트맵</h2><p class="cap">연령대별 ${AXES.length}축 평균</p><div class="heat" id="heat"></div></div></div>
+      <div class="card block"><h2>🚦 제품 랭킹 · 출시 판정</h2><p class="cap" id="rankCap">맛·관능 기준</p><div style="overflow-x:auto"><table id="rankTable"></table></div></div>
+      <div class="card block"><h2>🔥 세그먼트 × 항목 히트맵</h2><p class="cap">연령대별 ${AXES.length}항목 평균 · 칸 색이 진할수록 높은 점수 · "–"는 해당 응답 없음</p><div class="chips" id="heatMode" style="margin:0 0 10px"></div><div class="heat" id="heat"></div></div>
       <div class="card block"><h2>🗳️ 선택·투표 집계</h2><p class="cap">문항별 득표수와 비율 · 1위는 굵게 표시 · 구분 제목별로 묶음</p><div id="tally"></div></div>
       <div class="card block"><h2>💬 종합 의견</h2><p class="cap">자유 서술</p><div id="opinions"></div></div>`;
   }else{
@@ -534,7 +534,7 @@ function _renderDash(){
   renderKpis(ev,resp,names);renderInsight(ev,resp);
   if(HASP){
     renderPicker(names);renderDetail(names);
-    renderRank(ev);renderHeat(ev);
+    renderRank(ev);renderHeat(ev);buildHeatMode();
   }
   renderOpinions(resp);renderTally(resp);
 }
@@ -693,21 +693,31 @@ function renderRank(ev){const t=$("rankTable");const names=[...new Set(ev.map(e=
     <td class="prod-cell"><b><span class="brand-dot" style="background:${brandColor(prodBrands(x.p)[0]||x.p.brand)}"></span>${esc(x.p.name)}</b><span>${esc(brandLabel(x.p))} · ${esc(x.p.cat||"")}${splitTag(x.p.name)?` · <b style="color:var(--accent)">${splitTag(x.p.name)}</b>`:""}</span></td>
     <td class="score-b">${f1(x.taste)}</td><td class="score-b">${f1(x.sensory)}</td><td class="num" style="color:var(--faint)">${x.n}</td><td>${signal(x.taste,x.sensory,x.n)}</td></tr>`).join("")+`</tbody>`;}
 function heatColor(v){const t=Math.max(0,Math.min(1,(v-2.5)/2));const hue=8+t*132;const alpha=0.16+0.5*Math.abs(v-3)/2;return `hsl(${hue} 62% 48% / ${alpha})`;}
+function buildHeatMode(){
+  const box=$("heatMode"); if(!box) return; box.innerHTML="";
+  [["product","제품별"],["merged","통합 (이름 구성이 같은 제품끼리)"]].forEach(([k,l])=>{const b=document.createElement("button");b.className="chip"+((dstate.heat||"product")===k?" on":"");b.textContent=l;b.onclick=()=>{dstate.heat=k;renderDash();};box.appendChild(b);});
+}
 function renderHeat(ev){const el=$("heat");el.innerHTML="";
-  /* 제품마다 평가 항목 이름이 다를 수 있다 — 이름 구성이 같은 제품끼리 묶어 각각 그린다(한 표에 다른 질문이 섞이지 않게) */
-  const groups=[];
-  ev.forEach(e=>{const ax=axesForProd(CFG,e);const sig=ax.map(a=>a.label).join("|");let g=groups.find(x=>x.sig===sig);if(!g){g={sig,axes:ax,evs:[],names:[]};groups.push(g);}g.evs.push(e);if(!g.names.includes(e.name))g.names.push(e.name);});
-  if(!groups.length) groups.push({sig:"",axes:AXES,evs:[],names:[]});
+  const mode=dstate.heat||"product", groups=[];
+  if(mode==="product"){ // 제품마다 따로 — 그 제품 자신의 항목 이름으로
+    [...new Set(ev.map(e=>e.name))].forEach(nm=>{const evs=ev.filter(e=>e.name===nm); groups.push({axes:axesForProd(CFG,evs[0]),evs,names:[nm],brand:prodBrands(evs[0])[0]||evs[0].brand,title:nm+" · "+brandLabel(evs[0])});});
+  }else{ // 통합 — 항목 이름 구성이 같은 제품끼리 묶는다(한 표에 다른 질문이 섞이지 않게)
+    ev.forEach(e=>{const ax=axesForProd(CFG,e);const sig=ax.map(a=>a.label).join("|");let g=groups.find(x=>x.sig===sig);if(!g){g={sig,axes:ax,evs:[],names:[]};groups.push(g);}g.evs.push(e);if(!g.names.includes(e.name))g.names.push(e.name);});
+  }
+  if(!groups.length) groups.push({axes:AXES,evs:[],names:[]});
   let any=false;
   groups.forEach(g=>{
     const gev=g.evs, GA=g.axes, cols=GA.length;
-    if(groups.length>1){const t=document.createElement("div");t.className="cap";t.style.cssText="margin:10px 0 4px;font-weight:600";t.textContent=g.names.join(" · ");el.appendChild(t);}
+    if(mode==="product"||groups.length>1){const t=document.createElement("div");t.className="cap";t.style.cssText="margin:14px 0 5px;font-weight:600;color:var(--ink)";
+      t.innerHTML=(g.brand?`<span class="brand-dot" style="background:${brandColor(g.brand)}"></span>`:"")+esc(g.title||g.names.join(" · "))+(mode==="product"?` <span style="font-weight:400;color:var(--faint)">· 응답 ${gev.length}명</span>`:"");el.appendChild(t);}
     const mk=inner=>{const d=document.createElement("div");d.className="heat-row";d.style.gridTemplateColumns=`70px repeat(${cols},1fr)`;d.style.minWidth=Math.max(430,70+cols*68)+"px";d.innerHTML=inner;return d;};
     el.appendChild(mk(`<div></div>`+GA.map(a=>`<div class="heat-h">${esc(a.label)}</div>`).join("")));
-    const ages=dstate.age==="전체"?CFG.segments.age:[dstate.age];
-    ages.forEach(age=>{const sub=gev.filter(e=>e.age===age);let c=`<div class="heat-rl">${esc(age)}</div>`;
+    const rowOf=(label,sub)=>{let c=`<div class="heat-rl">${esc(label)}</div>`;
       c+=GA.map(a=>{const vals=sub.map(e=>e.s[a.key]).filter(v=>typeof v==="number");if(!vals.length)return `<div class="cell" style="color:var(--faint);background:var(--surface-2)">–</div>`;any=true;const v=avg(vals);return `<div class="cell" style="background:${heatColor(v)}">${f1(v)}</div>`;}).join("");
-      el.appendChild(mk(c));});
+      el.appendChild(mk(c));};
+    if(dstate.age==="전체") rowOf("전체",gev); // 연령 전체 평균 한 줄
+    const ages=dstate.age==="전체"?CFG.segments.age:[dstate.age];
+    ages.forEach(age=>rowOf(age,gev.filter(e=>e.age===age)));
   });
   if(!any)el.innerHTML=`<div class="empty">데이터 없음</div>`;}
 function renderPicker(names){const el=$("prodPicker");el.innerHTML="";names.forEach((nm,i)=>{const ex=evAll().find(e=>e.name===nm);const b=document.createElement("button");b.className="pp"+(dstate.product===i?" on":"");b.innerHTML=`<span class="brand-dot" style="background:${brandColor(ex.brand)}"></span>${esc(nm)}`;b.onclick=()=>{dstate.product=i;renderDash();};el.appendChild(b);});}
@@ -807,7 +817,7 @@ function _exportXlsx(){
   /* 시트 2. 세그먼트별 평균 (시식 + 응답자 정보 수집 시에만) */
   if(HASP&&ASKP){
     const sgs=[];
-    evA.forEach(e=>{const ax=axesForProd(CFG,e);const sig=ax.map(a=>a.label).join("|");let g=sgs.find(x=>x.sig===sig);if(!g){g={sig,axes:ax,evs:[],names:[]};sgs.push(g);}g.evs.push(e);if(!g.names.includes(e.name))g.names.push(e.name);});
+    evA.forEach(e=>{const ax=axesForProd(CFG,e);const sig=e.name;let g=sgs.find(x=>x.sig===sig);if(!g){g={sig,axes:ax,evs:[],names:[]};sgs.push(g);}g.evs.push(e);if(!g.names.includes(e.name))g.names.push(e.name);}); // 제품마다 한 블록
     if(!sgs.length) sgs.push({sig:"",axes:AXES,evs:[],names:[]});
     const seg=[];
     sgs.forEach((g,gi)=>{
