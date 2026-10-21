@@ -1,8 +1,9 @@
 // 결과 보고서를 실제 PDF 파일로 뽑아 페이지 나눔을 확인하는 검증용 스크립트 (Windows + Chrome, Node 22+)
-//   node tools/report-to-pdf.mjs <출력폴더> [회차ID] [사이트주소]
-//   예) node tools/report-to-pdf.mjs out 2026-10-시식-2 http://127.0.0.1:4500/
+//   node tools/report-to-pdf.mjs <출력폴더> [회차ID] [사이트주소] [가상응답수]
+//   예) node tools/report-to-pdf.mjs out 2026-10-시식-2 http://127.0.0.1:4500/ 100
 // 사이트에 접속해 해당 회차의 응답을 읽기만 하고(쓰기 없음), 보고서의 각 범위(전체/브랜드/투표·의견)를 Chrome 인쇄 경로로 PDF 로 저장한다.
-// 쪽 수·쪽별 내용은 pdftotext 등으로 확인한다. Chrome 경로가 다르면 아래 CHROME 을 고친다.
+// 가상응답수를 주면 응답이 많을 때(예: 100명)의 쪽 나눔을 화면 메모리에서만 흉내 낸다. 쪽 수·쪽별 내용은 pdftotext 등으로 확인한다.
+// Chrome 경로가 다르면 아래 CHROME 을 고친다.
 import { spawn } from "node:child_process";
 import { writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -12,6 +13,7 @@ const CHROME = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
 const OUT = process.argv[2];
 const SLUG = process.argv[3] || "2026-10-시식-2";
 const SITE = process.argv[4] || "https://lfjwlee-cmd.github.io/foodcost-survey/";
+const MOCK = +process.argv[5] || 0; // (선택) 응답자 수를 가상으로 늘려 많은 응답일 때의 쪽 나눔을 확인 — 화면 메모리에서만, DB 쓰기 없음
 mkdirSync(OUT, { recursive: true });
 const profile = path.join(tmpdir(), "pdf-prof-" + Date.now());
 const port = 9400 + Math.floor(Math.random() * 300);
@@ -31,6 +33,7 @@ try {
   await send("Page.navigate", { url: SITE + "?cb=pdf" + Date.now() + "#admin" });
   await sleep(4500);
   const html = await ev(`(async()=>{ try{clearInterval(timer)}catch(e){} unlocked=true; setView("results"); viewSlug=${JSON.stringify(SLUG)}; await loadDash(); try{clearInterval(timer)}catch(e){}
+    if(${MOCK}){ const real=ROWS; sb=null; ROWS=[...Array(${MOCK}).keys()].map(i=>({...real[i%real.length],extras:{...real[i%real.length].extras,opinion:"의견 "+(i+1)+" — 맛과 가격에 대한 의견을 조금 길게 적어 본 가상 문장입니다."}})); }
     let h=null; const oo=window.open; window.open=()=>({document:{open(){},write(x){h=x},close(){}}}); openReport(); window.open=oo; return h; })()`);
   if (!html) throw new Error("보고서 HTML 을 만들지 못함");
   writeFileSync(path.join(OUT, "report.html"), html);
