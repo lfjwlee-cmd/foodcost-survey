@@ -175,8 +175,10 @@
   input.acolor{padding:3px!important;height:36px;cursor:pointer}
   .addbtn{border:1px dashed var(--line-strong);background:none;color:var(--muted);border-radius:8px;padding:8px 12px;font-size:12.5px;cursor:pointer;font-family:inherit;margin-top:4px}
   .addbtn:hover{color:var(--accent);border-color:var(--accent)}
-  .sec-head{margin:36px 2px 16px;padding:14px 16px;border-left:4px solid var(--accent);background:var(--surface-2);border-radius:10px}
-  .sec-head h3{margin:0;font-size:16px}.sec-head p{margin:4px 0 0;font-size:12.5px;color:var(--muted);line-height:1.5}
+  .sec-head{margin:0;padding:24px 20px 4px;border-top:10px solid var(--bg)}
+  .sec-head h3{margin:0;font-size:16px;padding-left:10px;border-left:4px solid var(--accent);line-height:1.35}.sec-head p{margin:6px 0 0 14px;font-size:12.5px;color:var(--muted);line-height:1.5}
+  .sec-head + section.q{border-top:none;padding-top:14px}
+  .prev-body .sec-head + section.q{padding-top:12px}
   .stag{font-style:normal;font-size:11px;color:var(--accent);border:1px solid var(--accent);border-radius:999px;padding:1px 8px;margin-left:8px}
   .tally-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px 22px}
   .tally-sec{grid-column:1/-1;margin-top:6px;padding:7px 12px;border-left:4px solid var(--accent);background:var(--surface-2);border-radius:8px;font-size:13px}.tally-sec span{color:var(--muted);font-size:12px;margin-left:8px}
@@ -580,14 +582,16 @@ function pickBlocks(){return CFG.blocks.filter(b=>(b.type==="price"||b.type==="c
 function secBrandsOf(sec){ return (sec&&Array.isArray(sec.brands))?sec.brands:[]; }
 /* 투표 문항의 소속(브랜드) 판정 — 결과 화면 필터·브랜드별 PDF 가 같은 규칙을 쓴다.
    규칙은 하나: **바로 앞에 있는 제품 또는 구분 제목**이 소속을 정한다.
-   ① 바로 앞이 제품이면 그 제품의 브랜드(공통 메뉴면 여러 브랜드) ② 바로 앞이 구분 제목이면 그 제목에 지정한 브랜드(지정이 없으면 공통) ③ 아무것도 없으면(맨 앞) 공통 */
+   ① 바로 앞이 제품이면 그 제품의 브랜드(공통 메뉴면 여러 브랜드) ② 바로 앞이 구분 제목이면 그 제목에 지정한 브랜드(지정이 없으면 공통) ③ 아무것도 없으면(맨 앞) 공통
+   단, 문항에 "공통 질문으로 분리"(b.common)를 켠 경우는 위치와 상관없이 항상 공통 */
 function pickWithSec(){ const out=[]; let cur=null, ctx=null; // cur: 직전 구분 제목(묶음 표시용), ctx: 직전 제품 또는 구분 제목
   (CFG.blocks||[]).forEach(b=>{
     if(b.type==="section"){cur=b;ctx=b;return;}
     if(b.type==="product"){ctx=b;return;}
     if(b.type==="price"||b.type==="choice"||b.type==="imgchoice"||(b.type==="module"&&b.opts&&b.opts.length)){
       let owners=[], via="";
-      if(ctx&&ctx.type==="product"){owners=prodBrands(ctx).slice();via="product";}
+      if(b.common){ /* 공통 질문으로 분리: 바로 앞 제품·구분 제목과 상관없이 공통 */ }
+      else if(ctx&&ctx.type==="product"){owners=prodBrands(ctx).slice();via="product";}
       else if(ctx&&ctx.type==="section"&&secBrandsOf(ctx).length){owners=secBrandsOf(ctx).slice();via="section";}
       out.push({b,sec:cur,owners,via,prod:via==="product"?ctx:null}); } });
   return out; }
@@ -1263,7 +1267,7 @@ function edProds(){ return (ed&&ed.items?ed.items:[]).filter(x=>x.kind==="produc
 function buildEditModel(){
   const items=(draft.blocks||[]).map(b=>{
     if(b.type==="product"){ const brs=prodBrands(b).slice(); return {kind:"product",uid:newUid(),brands:brs,brand:brs[0]||"",name:b.name,tag:b.tag||"",axov:JSON.parse(JSON.stringify(((draft.meta&&draft.meta.productAxes)||{})[b.name]||{})),tasteN:(draft.meta&&draft.meta.productTaste&&typeof draft.meta.productTaste[b.name]==="number")?draft.meta.productTaste[b.name]:null}; }
-    const o={kind:"extra",type:b.type,q:b.q,label:b.label||"",opts:"",input:b.input||"",ph:b.type==="section"?(b.text||""):(b.ph||""),imgopts:[],req:b.req!==false,pin:!!b.pin,brands:Array.isArray(b.brands)?b.brands.slice():[]};
+    const o={kind:"extra",type:b.type,q:b.q,label:b.label||"",opts:"",input:b.input||"",ph:b.type==="section"?(b.text||""):(b.ph||""),imgopts:[],req:b.req!==false,pin:!!b.pin,common:!!b.common,brands:Array.isArray(b.brands)?b.brands.slice():[]};
     if(b.type==="imgchoice") o.imgopts=(b.opts||[]).map(x=>({label:x.label||"",image:x.image||""}));
     else o.opts=(b.opts||[]).join("\n");
     return o;
@@ -1282,7 +1286,7 @@ function renderEditor(){
   h+=`<div class="fld"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="ed_rubric" ${ed.showRubric?'checked':''} style="width:auto;margin:0"> 점수 기준 보기 표시 <span style="color:var(--faint);font-weight:400;font-size:11px">(껐다 켰다 가능 · 응답 폼 상단 안내)</span></label></div>`;
   h+=`<div class="fld"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="ed_ask" ${ed.askProfile?"checked":""} style="width:auto;margin:0"> 응답자 정보(성별·연령) 받기 <span style="color:var(--faint);font-weight:400;font-size:11px">(끄면 완전 익명 — 사내 투표처럼 소수가 응답할 때 권장)</span></label></div>`;
   if(edProds().length) h+=`<p style="font-size:11.5px;color:var(--faint);margin:0 0 12px">브랜드는 위 <b>브랜드 관리</b>에서 등록하면 아래 제품의 브랜드 목록에 자동으로 나타납니다.</p>`;
-  h+=`<div class="fld"><label>구성 <span style="color:var(--faint)">(위에서 아래 순서대로 응답자에게 보여요 · ▲▼로 순서 변경 · 제품은 평가 항목이 자동으로 붙고, 제품이 하나도 없으면 <b>투표 설문</b>)</span></label><div id="ed_items"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="addbtn" id="addProduct">+ 제품</button><button class="addbtn" id="addExtra">+ 문항</button></div><p style="font-size:11.5px;color:var(--faint);margin:6px 0 0">문항 = 선택 투표 · 사진 투표 · 자유 의견. 제품 이름은 서로 달라야 합니다(같은 이름이면 점수가 섞여요).<br>💡 투표 문항의 소속은 <b>바로 앞에 있는 제품(또는 구분 제목)</b>이 정해요. 제품 바로 뒤 문항은 그 제품(의 브랜드) 투표로 결과·PDF 의 해당 메뉴 구역에 들어가고, 전체에 대한 질문은 <b>구분 제목</b>으로 끊어 주세요(공통 질문).</p></div>`;
+  h+=`<div class="fld"><label>구성 <span style="color:var(--faint)">(위에서 아래 순서대로 응답자에게 보여요 · ▲▼로 순서 변경 · 제품은 평가 항목이 자동으로 붙고, 제품이 하나도 없으면 <b>투표 설문</b>)</span></label><div id="ed_items"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="addbtn" id="addProduct">+ 제품</button><button class="addbtn" id="addExtra">+ 문항</button></div><p style="font-size:11.5px;color:var(--faint);margin:6px 0 0">문항 = 선택 투표 · 사진 투표 · 자유 의견. 제품 이름은 서로 달라야 합니다(같은 이름이면 점수가 섞여요).<br>💡 투표 문항의 소속은 <b>바로 앞에 있는 제품(또는 구분 제목)</b>이 정해요. 제품 바로 뒤 문항은 그 제품(의 브랜드) 투표로 결과·PDF 의 해당 메뉴 구역에 들어갑니다. 전체에 대한 질문은 문항의 <b>"공통 질문으로 분리"</b>를 켜거나 <b>구분 제목</b>으로 끊어 주세요(공통 질문).</p></div>`;
   h+=`<div class="fld" id="ed_axes_wrap"></div>`;
   h+=`<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="abtn primary" id="edSaveAct">저장 &amp; 응답 폼에 활성화</button><button class="abtn" id="edSave">저장만</button></div></div>`;
   el.innerHTML=`<div class="ed-split"><div class="ed-main">${h}</div><aside class="ed-prev">${prevHtml}</aside></div>`;
@@ -1330,6 +1334,31 @@ function moveItem(i,d){
   const el=$("ed_items"); const b=el&&(el.querySelector(`[data-mv="${j}"][data-d="${d}"]:not([disabled])`)||el.querySelector(`[data-mv="${j}"]:not([disabled])`));
   if(b) b.focus(); // 같은 항목을 계속 움직일 수 있게 포커스를 따라가게 한다
 }
+/* 항목(제품·문항·구분 제목) 복사 — 원본 바로 아래에 넣는다. 제품은 이름이 겹치면 점수가 섞이므로 "(복사)" 이름으로, 문항은 새 내부 ID 로(응답이 원본과 섞이지 않게) */
+function dupItem(i){
+  const x=ed&&ed.items[i]; if(!x) return;
+  const c=JSON.parse(JSON.stringify(x));
+  if(c.kind==="product"){
+    c.uid=newUid(); const names=new Set(ed.items.filter(y=>y.kind==="product").map(y=>y.name));
+    let nm=x.name+" (복사)", k=2; while(names.has(nm)) nm=x.name+" (복사 "+(k++)+")"; c.name=nm;
+  }else{
+    if(c.type!=="section") c.q="q"+Math.random().toString(36).slice(2,7);
+    c.label=(c.label||"")+" (복사)";
+  }
+  ed.items.splice(i+1,0,c); renderItemRows();
+  const el=$("ed_items"), card=el&&el.querySelector(`[data-ci="${i+1}"]`);
+  if(card){ card.scrollIntoView({block:"nearest",behavior:"smooth"}); const inp=card.querySelector("input[data-k=name],input[data-k=label]"); if(inp) inp.focus({preventScroll:true}); }
+  previewTo(i+1);
+}
+/* 편집기용: 문항이 결과·PDF 에서 어디 소속인지(pickWithSec 와 같은 규칙) */
+function edOwnerOf(i){
+  const x=ed.items[i];
+  if(x.common) return {attached:false,text:"공통 질문(분리됨)"};
+  for(let j=i-1;j>=0;j--){ const y=ed.items[j];
+    if(y.kind==="product"){ const brs=(y.brands&&y.brands.length)?y.brands:[y.brand].filter(Boolean); return {attached:true,text:`${y.name||"(이름 없는 제품)"} 소속${brs.length?" ("+brs.join("·")+")":""}`}; }
+    if(y.kind==="extra"&&y.type==="section"){ const sb=y.brands||[]; return sb.length?{attached:true,text:`구분 제목 '${(y.label||"").trim()||"(제목 없음)"}' 소속 (${sb.join("·")})`}:{attached:false,text:"공통 질문"}; } }
+  return {attached:false,text:"공통 질문"};
+}
 function renderProductRows(){ renderItemRows(); } // 브랜드 등록·삭제 뒤에도 호출됨
 function renderItemRows(skipAxis){
   if(skipAxis!==true) renderAxisRows(); // 제품 유무에 따라 평가 항목 이름란 표시/숨김
@@ -1337,7 +1366,7 @@ function renderItemRows(skipAxis){
   const bopts=regBrandNames(), n=ed.items.length;
   const types=[["choice","선택 투표 (버튼형)"],["price","선택 투표 (목록형)"],["imgchoice","사진 투표"],["text","자유 의견"],["module","추가 의견 (항상 선택)"],["section","구분 제목 (질문 아님)"]];
   ed.items.forEach(x=>{ if(x.kind!=="product") return; if(!x.uid) x.uid=newUid(); if(!(x.brands&&x.brands.length)){ x.brands=x.brand?[x.brand]:(bopts.length?[bopts[0]]:[]); } x.brand=x.brands[0]||""; });
-  const head=(i,label,extra)=>`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:11.5px;color:var(--muted)"><b style="color:var(--accent)">${i+1}</b> · ${label}</span><span style="display:flex;gap:4px">${extra||""}<button type="button" class="abtn" data-mv="${i}" data-d="-1" title="위로" aria-label="위로" ${i===0?"disabled":""}>▲</button><button type="button" class="abtn" data-mv="${i}" data-d="1" title="아래로" aria-label="아래로" ${i===n-1?"disabled":""}>▼</button></span></div>`;
+  const head=(i,label,extra)=>`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:11.5px;color:var(--muted)"><b style="color:var(--accent)">${i+1}</b> · ${label}</span><span style="display:flex;gap:4px">${extra||""}<button type="button" class="abtn" data-dup="${i}" title="이 항목을 바로 아래에 복사합니다" aria-label="복사">⧉ 복사</button><button type="button" class="abtn" data-mv="${i}" data-d="-1" title="위로" aria-label="위로" ${i===0?"disabled":""}>▲</button><button type="button" class="abtn" data-mv="${i}" data-d="1" title="아래로" aria-label="아래로" ${i===n-1?"disabled":""}>▼</button></span></div>`;
   let h=(edProds().length&&!bopts.length)?`<div class="empty" style="padding:10px;font-size:12px">먼저 위 <b>브랜드 관리</b>에서 브랜드를 등록해 주세요. 제품에 붙일 이름표가 필요합니다.</div>`:"";
   h+=ed.items.map((x,i)=>{
     let bl;
@@ -1354,6 +1383,10 @@ function renderItemRows(skipAxis){
         <p style="font-size:11.5px;color:var(--faint);margin:6px 0 0">질문이 아니라 화면에 제목 띠만 표시됩니다(위 입력란이 제목). 소속 브랜드를 고르면 <b>이 제목 아래 투표</b>가 그 브랜드의 결과 필터·PDF 에 들어가요. 비워 두면 공통입니다.</p>`;
       else if(x.type==="imgchoice") bl+=`<div style="margin-top:8px" id="imgopts_${i}"></div><button type="button" class="addbtn" data-addimg="${i}">+ 사진 항목</button>`;
       else if(needOpts) bl+=`<div style="margin-top:6px"><textarea rows="3" style="width:100%;border:1px solid var(--line-strong);background:var(--field);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:13px;color:var(--ink);resize:vertical" data-i="${i}" data-k="opts" placeholder="선택지 — 한 줄에 하나씩:&#10;10,000원&#10;11,000원&#10;12,000원">${esc(x.opts)}</textarea></div>`;
+      if(x.type==="price"||x.type==="choice"||x.type==="imgchoice"||(x.type==="module"&&x.input!=="text")){
+        const ow=edOwnerOf(i); // 이 문항이 결과·PDF 에서 어디에 속하는지 — 붙었는지 떨어졌는지 바로 보이게
+        bl+=`<label style="font-size:11.5px;color:var(--muted);display:block;margin-top:7px"><input type="checkbox" style="width:auto;margin:0 4px 0 0;vertical-align:-2px" data-i="${i}" data-k="common" ${x.common?"checked":""}> 공통 질문으로 분리 <span style="color:var(--faint)">(켜면 앞 메뉴에서 떼어 결과·PDF 의 공통 질문으로 집계 · 응답 폼 위치는 그대로)</span></label><p style="font-size:11.5px;margin:3px 0 0;color:${ow.attached?"var(--accent)":"var(--faint)"}">결과 소속 → <b>${esc(ow.text)}</b></p>`;
+      }
       if(x.type==="module") bl+=`<label style="font-size:11.5px;color:var(--muted);display:block;margin-top:7px"><input type="checkbox" style="width:auto;margin:0 4px 0 0;vertical-align:-2px" data-i="${i}" data-k="modtext" ${x.input==="text"?"checked":""}> 자유입력(직접 추천)으로 받기</label>`;
       if(x.type==="price"||x.type==="choice"||x.type==="imgchoice") bl+=`<label style="font-size:11.5px;color:var(--muted);display:block;margin-top:7px"><input type="checkbox" style="width:auto;margin:0 4px 0 0;vertical-align:-2px" data-i="${i}" data-k="req" ${x.req!==false?"checked":""}> 필수 응답 <span style="color:var(--faint)">(끄면 건너뛸 수 있음)</span></label><label style="font-size:11.5px;color:var(--muted);display:block;margin-top:5px"><input type="checkbox" style="width:auto;margin:0 4px 0 0;vertical-align:-2px" data-i="${i}" data-k="pin" ${x.pin?"checked":""}> 결과 맨 위에 1위 강조 <span style="color:var(--faint)">(예: 출시 조합 투표)</span></label>`;
     }
@@ -1365,9 +1398,11 @@ function renderItemRows(skipAxis){
       else if(k==="type"){x.type=e.target.value;if(e.target.value==="imgchoice"&&!x.imgopts)x.imgopts=[];renderItemRows();}
       else if(k==="req"){x.req=e.target.checked;}
       else if(k==="pin"){x.pin=e.target.checked;}
+      else if(k==="common"){x.common=e.target.checked;renderItemRows(true);}
       else x[k]=e.target.value;
       if(x.kind==="product"&&k==="brand") renderAxisRows();};});
   el.querySelectorAll("[data-mv]").forEach(b=>b.onclick=()=>moveItem(+b.dataset.mv,+b.dataset.d));
+  el.querySelectorAll("[data-dup]").forEach(b=>b.onclick=()=>dupItem(+b.dataset.dup));
   el.querySelectorAll("input[data-bi]").forEach(c=>c.onchange=()=>{ // 브랜드 칩 — 하나는 반드시 남긴다
     const x=ed.items[+c.dataset.bi], bn=c.dataset.bn; if(!x) return; const set=new Set(x.brands||[]);
     if(c.checked) set.add(bn); else { if(set.size<=1){ c.checked=true; return; } set.delete(bn); }
@@ -1421,6 +1456,7 @@ function buildDraftCfg(){
     const b={type:x.type,q:x.q||("q"+Math.random().toString(36).slice(2,7)),label:x.label};
     if((x.type==="price"||x.type==="choice"||x.type==="imgchoice")&&x.req===false) b.req=false;
     if((x.type==="price"||x.type==="choice"||x.type==="imgchoice")&&x.pin) b.pin=true;
+    if(x.common&&(x.type==="price"||x.type==="choice"||x.type==="imgchoice"||(x.type==="module"&&x.input!=="text"))) b.common=true;
     if(x.type==="price"){b.opts=(x.opts||"").split("\n").map(s=>s.trim()).filter(Boolean);}
     else if(x.type==="choice"){b.opts=(x.opts||"").split("\n").map(s=>s.trim()).filter(Boolean);b.row=true;}
     else if(x.type==="imgchoice"){b.opts=(x.imgopts||[]).filter(o=>o.label).map(o=>({label:o.label,image:o.image||""}));}
