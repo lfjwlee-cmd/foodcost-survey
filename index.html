@@ -377,7 +377,8 @@ function buildFormHtml(cfg,opt){
       h+=`<section class="q"><div class="q-num">Q${n}</div><div class="qlabel">${esc(b.label)} ${isReq(b)?`<span class="req">*</span>`:`<span class="optm">선택</span>`}</div>
         <div class="imgchoices" data-extra="${b.q}">${(b.opts||[]).map(o=>`<button type="button" class="imgc" data-v="${esc(o.label)}">${o.image?`<img src="${esc(o.image)}" alt="">`:'<div class="noimg">사진 없음</div>'}<span>${esc(o.label)}</span></button>`).join("")}</div></section>`;
     }else if(b.type==="text"){
-      h+=`<section class="q"><div class="q-num">Q${n}</div><div class="qlabel">${esc(b.label)}</div><textarea data-extra="${b.q}"></textarea></section>`;
+      if(b.head) h+=`<div class="sec-head"><h3>${esc(b.head)}</h3>${b.label?`<p>${esc(b.label)}</p>`:""}</div><section class="q"><div class="q-num">Q${n}</div><textarea data-extra="${b.q}" aria-label="${esc(b.head+(b.label?" — "+b.label:""))}"></textarea></section>`;
+      else h+=`<section class="q"><div class="q-num">Q${n}</div><div class="qlabel">${esc(b.label)}</div><textarea data-extra="${b.q}"></textarea></section>`;
     }else if(b.type==="module"){
       h+=`<section class="q"><div class="q-num">Q${n}</div><div class="optional-mod"><span class="modtag">◎ 선택 · ${esc(b.tag||"")}</span><div class="qlabel" style="margin:8px 0 12px">${esc(b.label)}</div>`;
       h+= (b.opts&&b.opts.length)?`<div class="choices row" data-extra="${b.q}">${b.opts.map(o=>`<button type="button" class="cbtn" data-v="${esc(o)}">${esc(o)}</button>`).join("")}</div>`:`<textarea data-extra="${b.q}" placeholder="${esc(b.ph||"")}"></textarea>`;
@@ -1267,7 +1268,7 @@ function edProds(){ return (ed&&ed.items?ed.items:[]).filter(x=>x.kind==="produc
 function buildEditModel(){
   const items=(draft.blocks||[]).map(b=>{
     if(b.type==="product"){ const brs=prodBrands(b).slice(); return {kind:"product",uid:newUid(),brands:brs,brand:brs[0]||"",name:b.name,tag:b.tag||"",axov:JSON.parse(JSON.stringify(((draft.meta&&draft.meta.productAxes)||{})[b.name]||{})),tasteN:(draft.meta&&draft.meta.productTaste&&typeof draft.meta.productTaste[b.name]==="number")?draft.meta.productTaste[b.name]:null}; }
-    const o={kind:"extra",type:b.type,q:b.q,label:b.label||"",opts:"",input:b.input||"",ph:b.type==="section"?(b.text||""):(b.ph||""),imgopts:[],req:b.req!==false,pin:!!b.pin,common:!!b.common,brands:Array.isArray(b.brands)?b.brands.slice():[]};
+    const o={kind:"extra",type:b.type,q:b.q,label:b.label||"",opts:"",input:b.input||"",ph:b.type==="section"?(b.text||""):(b.ph||""),imgopts:[],req:b.req!==false,pin:!!b.pin,common:!!b.common,head:b.type==="text"?(b.head||""):"",brands:Array.isArray(b.brands)?b.brands.slice():[]};
     if(b.type==="imgchoice") o.imgopts=(b.opts||[]).map(x=>({label:x.label||"",image:x.image||""}));
     else o.opts=(b.opts||[]).join("\n");
     return o;
@@ -1311,7 +1312,7 @@ function previewTo(i){
   const pb=$("previewBody"); if(!pb||!ed) return; const form=pb.querySelector("form"); const it=ed.items[i]; if(!form||!it) return;
   const shown=x=>x.kind==="product"?!!x.name:(x.type==="section"?!!((x.label||"").trim()||(x.ph||"").trim()):true); // 폼에 실제로 그려지는 항목만
   if(!shown(it)) return;
-  let k=0; for(let j=0;j<i;j++) if(shown(ed.items[j])) k++;
+  let k=0; for(let j=0;j<i;j++){ const y=ed.items[j]; if(shown(y)) k+=(y.kind==="extra"&&y.type==="text"&&(y.head||"").trim())?2:1; } // 제목 띠 + 입력칸 = 폼 요소 2개
   const els=[...form.children].filter(e=>(e.classList.contains("sec-head")||e.matches("section.q"))&&!e.querySelector("[data-seg]"));
   const t=els[k]; if(!t) return; const wrap=pb.closest(".prev-wrap"); if(!wrap) return;
   const top=t.getBoundingClientRect().top-wrap.getBoundingClientRect().top+wrap.scrollTop-10;
@@ -1382,6 +1383,7 @@ function renderItemRows(skipAxis){
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px"><span style="font-size:11.5px;color:var(--muted)">소속 브랜드(선택)</span>${bopts.map(b=>{const on=(x.brands||[]).includes(b);return `<label class="bchip${on?" on":""}"><input type="checkbox" data-bs="${i}" data-bn="${esc(b)}" ${on?"checked":""}> ${esc(b)}</label>`;}).join("")}</div>
         <p style="font-size:11.5px;color:var(--faint);margin:6px 0 0">질문이 아니라 화면에 제목 띠만 표시됩니다(위 입력란이 제목). 소속 브랜드를 고르면 <b>이 제목 아래 투표</b>가 그 브랜드의 결과 필터·PDF 에 들어가요. 비워 두면 공통입니다.</p>`;
       else if(x.type==="imgchoice") bl+=`<div style="margin-top:8px" id="imgopts_${i}"></div><button type="button" class="addbtn" data-addimg="${i}">+ 사진 항목</button>`;
+      else if(x.type==="text") bl+=`<div style="margin-top:6px"><input style="width:100%;border:1px solid var(--line-strong);background:var(--field);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:13px;color:var(--ink)" value="${esc(x.head||"")}" data-i="${i}" data-k="head" placeholder="제목 띠(선택) — 예: 종합 정리"></div><p style="font-size:11.5px;color:var(--faint);margin:6px 0 0">제목 띠를 적으면 <b>제목 + 질문 문구(작은 글씨) + 입력칸</b>이 한 묶음으로 보입니다(별도 구분 제목이 필요 없어요). 비우면 질문 문구만 보이는 일반 의견칸입니다.</p>`;
       else if(needOpts) bl+=`<div style="margin-top:6px"><textarea rows="3" style="width:100%;border:1px solid var(--line-strong);background:var(--field);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:13px;color:var(--ink);resize:vertical" data-i="${i}" data-k="opts" placeholder="선택지 — 한 줄에 하나씩:&#10;10,000원&#10;11,000원&#10;12,000원">${esc(x.opts)}</textarea></div>`;
       if(x.type==="price"||x.type==="choice"||x.type==="imgchoice"||(x.type==="module"&&x.input!=="text")){
         const ow=edOwnerOf(i); // 이 문항이 결과·PDF 에서 어디에 속하는지 — 붙었는지 떨어졌는지 바로 보이게
@@ -1460,7 +1462,7 @@ function buildDraftCfg(){
     if(x.type==="price"){b.opts=(x.opts||"").split("\n").map(s=>s.trim()).filter(Boolean);}
     else if(x.type==="choice"){b.opts=(x.opts||"").split("\n").map(s=>s.trim()).filter(Boolean);b.row=true;}
     else if(x.type==="imgchoice"){b.opts=(x.imgopts||[]).filter(o=>o.label).map(o=>({label:o.label,image:o.image||""}));}
-    else if(x.type==="text"){b.ph=x.ph||"";}
+    else if(x.type==="text"){b.ph=x.ph||""; if((x.head||"").trim()) b.head=x.head.trim();}
     else if(x.type==="module"){b.tag="추천 · 선택";if(x.input==="text"){b.input="text";b.ph=x.ph||"";}else{b.opts=(x.opts||"").split("\n").map(s=>s.trim()).filter(Boolean);}}
     blocks.push(b);});
   const cfg=JSON.parse(JSON.stringify(draft)); cfg.slug=ed.slug; cfg.meta=cfg.meta||{};
