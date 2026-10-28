@@ -377,8 +377,8 @@ function buildFormHtml(cfg,opt){
       h+=`<section class="q"><div class="q-num">Q${n}</div><div class="qlabel">${esc(b.label)} ${isReq(b)?`<span class="req">*</span>`:`<span class="optm">선택</span>`}</div>
         <div class="imgchoices" data-extra="${b.q}">${(b.opts||[]).map(o=>`<button type="button" class="imgc" data-v="${esc(o.label)}">${o.image?`<img src="${esc(o.image)}" alt="">`:'<div class="noimg">사진 없음</div>'}<span>${esc(o.label)}</span></button>`).join("")}</div></section>`;
     }else if(b.type==="text"){
-      if(b.head) h+=`<div class="sec-head"><h3>${esc(b.head)}</h3>${b.label?`<p>${esc(b.label)}</p>`:""}</div><section class="q"><div class="q-num">Q${n}</div><textarea data-extra="${b.q}" aria-label="${esc(b.head+(b.label?" — "+b.label:""))}"></textarea></section>`;
-      else h+=`<section class="q"><div class="q-num">Q${n}</div><div class="qlabel">${esc(b.label)}</div><textarea data-extra="${b.q}"></textarea></section>`;
+      if(b.head) h+=`<div class="sec-head"><h3>${esc(b.head)}${isReq(b)?` <span class="req">*</span>`:""}</h3>${b.label?`<p>${esc(b.label)}</p>`:""}</div><section class="q"><div class="q-num">Q${n}</div><textarea data-extra="${b.q}" aria-label="${esc(b.head+(b.label?" — "+b.label:""))}"></textarea></section>`;
+      else h+=`<section class="q"><div class="q-num">Q${n}</div><div class="qlabel">${esc(b.label)}${isReq(b)?` <span class="req">*</span>`:""}</div><textarea data-extra="${b.q}"></textarea></section>`;
     }else if(b.type==="module"){
       h+=`<section class="q"><div class="q-num">Q${n}</div><div class="optional-mod"><span class="modtag">◎ 선택 · ${esc(b.tag||"")}</span><div class="qlabel" style="margin:8px 0 12px">${esc(b.label)}</div>`;
       h+= (b.opts&&b.opts.length)?`<div class="choices row" data-extra="${b.q}">${b.opts.map(o=>`<button type="button" class="cbtn" data-v="${esc(o)}">${esc(o)}</button>`).join("")}</div>`:`<textarea data-extra="${b.q}" placeholder="${esc(b.ph||"")}"></textarea>`;
@@ -400,7 +400,7 @@ function wireForm(){
     ch.querySelectorAll(".cbtn").forEach(x=>x.classList.remove("on"));btn.classList.add("on");answers.extras[ch.dataset.extra]=btn.dataset.v;prog();}));
   document.querySelectorAll(".imgchoices[data-extra]").forEach(ch=>ch.querySelectorAll(".imgc").forEach(btn=>btn.onclick=()=>{
     ch.querySelectorAll(".imgc").forEach(x=>x.classList.remove("on"));btn.classList.add("on");answers.extras[ch.dataset.extra]=btn.dataset.v;prog();}));
-  document.querySelectorAll("textarea[data-extra]").forEach(t=>t.oninput=()=>{answers.extras[t.dataset.extra]=t.value;});
+  document.querySelectorAll("textarea[data-extra]").forEach(t=>t.oninput=()=>{answers.extras[t.dataset.extra]=t.value;prog();});
   $("form").addEventListener("click",ev=>{const s=ev.target.closest("section.q.missing");if(s)s.classList.remove("missing");});
   $("form").onsubmit=submit;
 }
@@ -409,10 +409,12 @@ function isPick(b){return b.type==="price"||b.type==="choice"||b.type==="imgchoi
 function hasProd(cfg){return (((cfg||CFG)||{}).blocks||[]).some(b=>b.type==="product");}
 /* 응답자 정보(성별·연령) 수집 여부 — 기본 수집(기존 설문 호환) */
 function askProfile(cfg){return ((((cfg||CFG)||{}).meta)||{}).askProfile!==false;}
-/* 문항별 필수 여부 — 기본 필수(기존 설문 호환) */
-function isReq(b){return b.req!==false;}
-function reqCount(){let c=askProfile()?2:0;CFG.blocks.forEach(b=>{if(b.type==="product")c+=AXES.length;if(isPick(b)&&isReq(b))c++;});return Math.max(1,c);}
-function doneCount(){let c=0;if(askProfile()){if(answers.gender)c++;if(answers.age)c++;}CFG.blocks.forEach(b=>{if(b.type==="product"){const s=answers.scores[b.name]||{};c+=AXES.filter(a=>s[a.key]).length;}if(isPick(b)&&isReq(b)&&answers.extras[b.q])c++;});return c;}
+/* 문항별 필수 여부 — 선택·사진 투표는 기본 필수(req:false 로 끔), 자유 의견은 기본 선택(req:true 로 켬). 기존 설문 호환 */
+function isReq(b){return b.type==="text"?b.req===true:b.req!==false;}
+function needAns(b){return (isPick(b)||b.type==="text")&&isReq(b);}
+function hasAns(b){const v=answers.extras[b.q];return b.type==="text"?!!(v&&String(v).trim()):!!v;}
+function reqCount(){let c=askProfile()?2:0;CFG.blocks.forEach(b=>{if(b.type==="product")c+=AXES.length;if(needAns(b))c++;});return Math.max(1,c);}
+function doneCount(){let c=0;if(askProfile()){if(answers.gender)c++;if(answers.age)c++;}CFG.blocks.forEach(b=>{if(b.type==="product"){const s=answers.scores[b.name]||{};c+=AXES.filter(a=>s[a.key]).length;}if(needAns(b)&&hasAns(b))c++;});return c;}
 function prog(){$("pbar").style.width=Math.min(100,6+doneCount()/reqCount()*94)+"%";}
 function attrEsc(v){return String(v).replace(/["\\]/g,'\\$&');}
 function firstMissing(){
@@ -423,6 +425,7 @@ function firstMissing(){
   for(const b of CFG.blocks){
     if(b.type==="product"){const s=answers.scores[b.name]||{};for(const a of axesForProd(CFG,b))if(!s[a.key])return {msg:`'${b.name}'의 [${a.label}] 점수를 선택해 주세요`,sel:`.scale[data-prod="${attrEsc(b.name)}"][data-axis="${a.key}"]`};}
     if(isPick(b)&&isReq(b)&&!answers.extras[b.q])return {msg:`'${b.label}'을(를) 선택해 주세요`,sel:`[data-extra="${attrEsc(b.q)}"]`};
+    if(b.type==="text"&&isReq(b)&&!hasAns(b))return {msg:`'${b.head||b.label||"의견"}'을(를) 입력해 주세요`,sel:`[data-extra="${attrEsc(b.q)}"]`};
   } return null;
 }
 async function submit(e){
@@ -1268,7 +1271,7 @@ function edProds(){ return (ed&&ed.items?ed.items:[]).filter(x=>x.kind==="produc
 function buildEditModel(){
   const items=(draft.blocks||[]).map(b=>{
     if(b.type==="product"){ const brs=prodBrands(b).slice(); return {kind:"product",uid:newUid(),brands:brs,brand:brs[0]||"",name:b.name,tag:b.tag||"",axov:JSON.parse(JSON.stringify(((draft.meta&&draft.meta.productAxes)||{})[b.name]||{})),tasteN:(draft.meta&&draft.meta.productTaste&&typeof draft.meta.productTaste[b.name]==="number")?draft.meta.productTaste[b.name]:null}; }
-    const o={kind:"extra",type:b.type,q:b.q,label:b.label||"",opts:"",input:b.input||"",ph:b.type==="section"?(b.text||""):(b.ph||""),imgopts:[],req:b.req!==false,pin:!!b.pin,common:!!b.common,head:b.type==="text"?(b.head||""):"",brands:Array.isArray(b.brands)?b.brands.slice():[]};
+    const o={kind:"extra",type:b.type,q:b.q,label:b.label||"",opts:"",input:b.input||"",ph:b.type==="section"?(b.text||""):(b.ph||""),imgopts:[],req:b.type==="text"?b.req===true:b.req!==false,pin:!!b.pin,common:!!b.common,head:b.type==="text"?(b.head||""):"",brands:Array.isArray(b.brands)?b.brands.slice():[]};
     if(b.type==="imgchoice") o.imgopts=(b.opts||[]).map(x=>({label:x.label||"",image:x.image||""}));
     else o.opts=(b.opts||[]).join("\n");
     return o;
@@ -1383,7 +1386,7 @@ function renderItemRows(skipAxis){
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px"><span style="font-size:11.5px;color:var(--muted)">소속 브랜드(선택)</span>${bopts.map(b=>{const on=(x.brands||[]).includes(b);return `<label class="bchip${on?" on":""}"><input type="checkbox" data-bs="${i}" data-bn="${esc(b)}" ${on?"checked":""}> ${esc(b)}</label>`;}).join("")}</div>
         <p style="font-size:11.5px;color:var(--faint);margin:6px 0 0">질문이 아니라 화면에 제목 띠만 표시됩니다(위 입력란이 제목). 소속 브랜드를 고르면 <b>이 제목 아래 투표</b>가 그 브랜드의 결과 필터·PDF 에 들어가요. 비워 두면 공통입니다.</p>`;
       else if(x.type==="imgchoice") bl+=`<div style="margin-top:8px" id="imgopts_${i}"></div><button type="button" class="addbtn" data-addimg="${i}">+ 사진 항목</button>`;
-      else if(x.type==="text") bl+=`<div style="margin-top:6px"><input style="width:100%;border:1px solid var(--line-strong);background:var(--field);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:13px;color:var(--ink)" value="${esc(x.head||"")}" data-i="${i}" data-k="head" placeholder="제목 띠(선택) — 예: 종합 정리"></div><p style="font-size:11.5px;color:var(--faint);margin:6px 0 0">제목 띠를 적으면 <b>제목 + 질문 문구(작은 글씨) + 입력칸</b>이 한 묶음으로 보입니다(별도 구분 제목이 필요 없어요). 비우면 질문 문구만 보이는 일반 의견칸입니다.</p>`;
+      else if(x.type==="text") bl+=`<div style="margin-top:6px"><input style="width:100%;border:1px solid var(--line-strong);background:var(--field);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:13px;color:var(--ink)" value="${esc(x.head||"")}" data-i="${i}" data-k="head" placeholder="제목 띠(선택) — 예: 종합 정리"></div><p style="font-size:11.5px;color:var(--faint);margin:6px 0 0">제목 띠를 적으면 <b>제목 + 질문 문구(작은 글씨) + 입력칸</b>이 한 묶음으로 보입니다(별도 구분 제목이 필요 없어요). 비우면 질문 문구만 보이는 일반 의견칸입니다.</p><label style="font-size:11.5px;color:var(--muted);display:block;margin-top:7px"><input type="checkbox" style="width:auto;margin:0 4px 0 0;vertical-align:-2px" data-i="${i}" data-k="req" ${x.req===true?"checked":""}> 필수 응답 <span style="color:var(--faint)">(켜면 비워 두고 제출할 수 없음 · 기본은 선택)</span></label>`;
       else if(needOpts) bl+=`<div style="margin-top:6px"><textarea rows="3" style="width:100%;border:1px solid var(--line-strong);background:var(--field);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:13px;color:var(--ink);resize:vertical" data-i="${i}" data-k="opts" placeholder="선택지 — 한 줄에 하나씩:&#10;10,000원&#10;11,000원&#10;12,000원">${esc(x.opts)}</textarea></div>`;
       if(x.type==="price"||x.type==="choice"||x.type==="imgchoice"||(x.type==="module"&&x.input!=="text")){
         const ow=edOwnerOf(i); // 이 문항이 결과·PDF 에서 어디에 속하는지 — 붙었는지 떨어졌는지 바로 보이게
@@ -1397,7 +1400,9 @@ function renderItemRows(skipAxis){
   el.querySelectorAll("[data-k]").forEach(inp=>{if(inp.dataset.k==="imglabel")return;const ev=(inp.tagName==="SELECT"||inp.type==="checkbox")?"onchange":"oninput";
     inp[ev]=e=>{const x=ed.items[+e.target.dataset.i],k=e.target.dataset.k; if(!x)return;
       if(k==="modtext"){x.input=e.target.checked?"text":"";renderItemRows();}
-      else if(k==="type"){x.type=e.target.value;if(e.target.value==="imgchoice"&&!x.imgopts)x.imgopts=[];renderItemRows();}
+      else if(k==="type"){const was=x.type; x.type=e.target.value;if(e.target.value==="imgchoice"&&!x.imgopts)x.imgopts=[];
+        if((was==="text")!==(x.type==="text")) x.req=(x.type!=="text"); // 의견↔투표로 바꿀 때 필수 기본값(투표=필수, 의견=선택)으로 되돌림
+        renderItemRows();}
       else if(k==="req"){x.req=e.target.checked;}
       else if(k==="pin"){x.pin=e.target.checked;}
       else if(k==="common"){x.common=e.target.checked;renderItemRows(true);}
@@ -1462,7 +1467,7 @@ function buildDraftCfg(){
     if(x.type==="price"){b.opts=(x.opts||"").split("\n").map(s=>s.trim()).filter(Boolean);}
     else if(x.type==="choice"){b.opts=(x.opts||"").split("\n").map(s=>s.trim()).filter(Boolean);b.row=true;}
     else if(x.type==="imgchoice"){b.opts=(x.imgopts||[]).filter(o=>o.label).map(o=>({label:o.label,image:o.image||""}));}
-    else if(x.type==="text"){b.ph=x.ph||""; if((x.head||"").trim()) b.head=x.head.trim();}
+    else if(x.type==="text"){b.ph=x.ph||""; if((x.head||"").trim()) b.head=x.head.trim(); if(x.req===true) b.req=true;}
     else if(x.type==="module"){b.tag="추천 · 선택";if(x.input==="text"){b.input="text";b.ph=x.ph||"";}else{b.opts=(x.opts||"").split("\n").map(s=>s.trim()).filter(Boolean);}}
     blocks.push(b);});
   const cfg=JSON.parse(JSON.stringify(draft)); cfg.slug=ed.slug; cfg.meta=cfg.meta||{};
