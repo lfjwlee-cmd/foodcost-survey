@@ -126,7 +126,11 @@
   .heat{display:grid;gap:4px;overflow-x:auto}.heat-row{display:grid;gap:4px;min-width:430px}
   .heat-h{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--faint);text-align:center;padding:4px 0;line-height:1.2;word-break:keep-all;overflow-wrap:anywhere}
   .heat-rl{font-size:12px;color:var(--muted);display:flex;align-items:center;font-weight:500}
-  .cell{border-radius:7px;padding:9px 0;text-align:center;font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-weight:600;font-size:13.5px;color:var(--ink)}
+  .cell{border-radius:7px;padding:10px 0;text-align:center;font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-weight:600;font-size:14px;color:var(--ink)}
+  /* 기준 대비 3색 — PDF 보고서와 같은 구분(기준 이상 초록 · 0.5점 이내 미달 노랑 · 그 아래 붉은색). 테마 색을 섞어 다크 모드에서도 맞는다 */
+  .cell.hg{background:color-mix(in srgb,var(--good) 26%,var(--surface))}.cell.hy{background:color-mix(in srgb,var(--warn) 30%,var(--surface))}.cell.hr{background:color-mix(in srgb,var(--bad) 26%,var(--surface))}
+  .heat-rl small{font-weight:400;color:var(--faint);margin-left:4px;font-size:10.5px}.heat-h b{display:block;color:var(--ink);font-family:inherit;font-size:11px;font-weight:600}
+  .hk{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin:0 3px 0 8px}.hk.hg{background:color-mix(in srgb,var(--good) 40%,var(--surface))}.hk.hy{background:color-mix(in srgb,var(--warn) 45%,var(--surface))}.hk.hr{background:color-mix(in srgb,var(--bad) 40%,var(--surface))}
   .radar-wrap{display:flex;justify-content:center;padding:6px 0}.radar-legend{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:6px;font-size:12px;color:var(--muted)}.lg{display:inline-flex;align-items:center;gap:6px}.lg i{width:11px;height:3px;border-radius:2px}
   .bar-row{display:grid;grid-template-columns:120px 1fr 42px;align-items:center;gap:10px;margin-bottom:8px;font-size:12.5px}
   .bar-track{background:var(--surface-2);border-radius:6px;height:21px;overflow:hidden;border:1px solid var(--line)}.bar-fill{height:100%;border-radius:6px 0 0 6px;background:var(--accent);transition:width .4s}.bar-fill.alt{background:color-mix(in srgb,var(--accent) 55%,var(--muted))}
@@ -545,7 +549,7 @@ function _renderDash(){
         <div class="card c-tally"><h2>🗳️ 선택·투표 집계</h2><p class="cap">문항별 득표수와 비율 · 1위는 굵게 표시 · 구분 제목별로 묶음</p><div id="tally"></div></div>
       </div>
       <div class="dcol dcol-r">
-        <div class="card c-heat"><h2>🔥 세그먼트 × 항목 히트맵</h2><p class="cap">연령대별 ${AXES.length}항목 평균 · 칸 색이 진할수록 높은 점수 · "–"는 해당 응답 없음</p><div class="chips" id="heatMode" style="margin:0 0 10px"></div><div class="heat" id="heat"></div></div>
+        <div class="card c-heat"><h2>🔥 세그먼트 × 항목 히트맵</h2><p class="cap">연령대별 ${AXES.length}항목 평균 · "–"는 해당 응답 없음<br><span class="hk hg" style="margin-left:0"></span>판정 기준 이상<span class="hk hy"></span>기준에 0.5점 이내 미달<span class="hk hr"></span>그보다 낮음</p><div class="chips" id="heatMode" style="margin:0 0 10px"></div><div class="heat" id="heat"></div></div>
       </div>
     </div>`;
   }else{
@@ -727,6 +731,8 @@ function renderRank(ev){const t=$("rankTable");const names=[...new Set(ev.map(e=
   t.innerHTML=`<thead><tr><th>제품</th><th>맛</th><th>관능</th><th>표본</th><th>판정</th></tr></thead><tbody>`+rows.map(x=>`<tr>
     <td class="prod-cell"><b><span class="brand-dot" style="background:${brandColor(prodBrands(x.p)[0]||x.p.brand)}"></span>${esc(x.p.name)}</b><span>${esc(brandLabel(x.p))} · ${esc(x.p.cat||"")}${splitTag(x.p.name)?` · <b style="color:var(--accent)">${splitTag(x.p.name)}</b>`:""}</span></td>
     <td class="score-b">${f1(x.taste)}</td><td class="score-b">${f1(x.sensory)}</td><td class="num" style="color:var(--faint)">${x.n}</td><td>${signal(x.taste,x.sensory,x.n)}</td></tr>`).join("")+`</tbody>`;}
+/* 점수 → 기준 대비 3색 클래스. 맛 묶음은 맛 기준, 관능 묶음은 관능 기준(PDF 와 동일) */
+function heatCls(v,grp){const m=grp==="taste"?TASTE_MIN:SENSORY_MIN;return v>=m?"hg":(v>=m-0.5?"hy":"hr");}
 function heatColor(v){const t=Math.max(0,Math.min(1,(v-2.5)/2));const hue=8+t*132;const alpha=0.16+0.5*Math.abs(v-3)/2;return `hsl(${hue} 62% 48% / ${alpha})`;}
 function buildHeatMode(){
   const box=$("heatMode"); if(!box) return; box.innerHTML="";
@@ -745,10 +751,10 @@ function renderHeat(ev){const el=$("heat");el.innerHTML="";
     const gev=g.evs, GA=g.axes, cols=GA.length;
     if(mode==="product"||groups.length>1){const t=document.createElement("div");t.className="cap";t.style.cssText="margin:14px 0 5px;font-weight:600;color:var(--ink)";
       t.innerHTML=(g.brand?`<span class="brand-dot" style="background:${brandColor(g.brand)}"></span>`:"")+esc(g.title||g.names.join(" · "))+(mode==="product"?` <span style="font-weight:400;color:var(--faint)">· 응답 ${gev.length}명</span>`:"");el.appendChild(t);}
-    const mk=inner=>{const d=document.createElement("div");d.className="heat-row";d.style.gridTemplateColumns=`58px repeat(${cols},1fr)`;d.style.minWidth=Math.max(340,58+cols*44)+"px";d.innerHTML=inner;return d;};
-    el.appendChild(mk(`<div></div>`+GA.map(a=>`<div class="heat-h">${esc(a.label)}</div>`).join("")));
-    const rowOf=(label,sub)=>{let c=`<div class="heat-rl">${esc(label)}</div>`;
-      c+=GA.map(a=>{const vals=sub.map(e=>e.s[a.key]).filter(v=>typeof v==="number");if(!vals.length)return `<div class="cell" style="color:var(--faint);background:var(--surface-2)">–</div>`;any=true;const v=avg(vals);return `<div class="cell" style="background:${heatColor(v)}">${f1(v)}</div>`;}).join("");
+    const mk=inner=>{const d=document.createElement("div");d.className="heat-row";d.style.gridTemplateColumns=`${mode==="product"?84:58}px repeat(${cols},1fr)`;d.style.minWidth=Math.max(340,(mode==="product"?84:58)+cols*46)+"px";d.innerHTML=inner;return d;};
+    el.appendChild(mk(`<div></div>`+GA.map(a=>`<div class="heat-h"><b>${esc(a.label)}</b>${axisGroup(a)==="taste"?"맛":"관능"}</div>`).join("")));
+    const rowOf=(label,sub)=>{let c=`<div class="heat-rl">${esc(label)}${mode==="product"?`<small>${sub.length}명</small>`:""}</div>`;
+      c+=GA.map(a=>{const vals=sub.map(e=>e.s[a.key]).filter(v=>typeof v==="number");if(!vals.length)return `<div class="cell" style="color:var(--faint);background:var(--surface-2)">–</div>`;any=true;const v=avg(vals);return `<div class="cell ${heatCls(v,axisGroup(a))}">${f1(v)}</div>`;}).join("");
       el.appendChild(mk(c));};
     if(dstate.age==="전체") rowOf("전체",gev); // 연령 전체 평균 한 줄
     const ages=dstate.age==="전체"?CFG.segments.age:[dstate.age];
