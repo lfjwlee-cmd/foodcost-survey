@@ -981,8 +981,6 @@ function _openReport(){
   const gTitle=g=>g.names.length?(g.brands.length>1?`공통 메뉴 · ${g.brands.join(" · ")}`:`${g.brands[0]} 전용`):(g.brands.length>1?`공통 투표 · ${g.brands.join(" · ")}`:`${g.brands[0]} 관련 투표`);
   const kpiHtml=(rk,n)=>`<div class="kpis"><div class="kpi"><b>${n}명</b><span>응답</span></div><div class="kpi"><b>${rk.length}종</b><span>평가 제품</span></div><div class="kpi"><b>${rk.length?f1(rk[0].taste):"-"}/5</b><span>맛 · 1위 ${rk.length?esc(rk[0].name):"-"}</span></div><div class="kpi"><b>${rk.length?f1(rk[0].sensory):"-"}/5</b><span>관능 · 1위 ${rk.length?esc(rk[0].name):"-"}</span></div></div>`;
   const rankTable=(rk,withBrand)=>`<table class="fx"><colgroup><col style="width:${withBrand?32:44}%">${withBrand?'<col style="width:16%">':""}<col style="width:10%"><col style="width:10%"><col style="width:8%"><col style="width:${withBrand?24:28}%"></colgroup><tr><th class="l">제품</th>${withBrand?"<th>브랜드</th>":""}<th>맛</th><th>관능</th><th>표본</th><th>판정</th></tr>${rk.map(x=>`<tr><td class="l">${esc(x.name)}${splitTag(x.name)?`<br><small style="color:#c1553a">${splitTag(x.name)}</small>`:""}</td>${withBrand?`<td>${esc(x.brand||"")}</td>`:""}<td>${f1(x.taste)}</td><td>${f1(x.sensory)}</td><td>${x.n}</td><td>${sigTxt(x.taste,x.sensory,x.n)}</td></tr>`).join("")}</table>`;
-  const AL=axisLabels();
-  const rule=`<p class="note">※ ${AL.taste} ${TASTE_MIN} 이상 그리고 ${AL.sensory} ${SENSORY_MIN} 이상이면 다음 단계 진행 판정입니다. 표본 ${MIN_SAMPLE}명 미만은 표본 부족으로 표시됩니다. 항목 표의 칸 색은 기준 이상 초록 · 기준에 0.5점 이내로 못 미치면 노랑 · 그보다 낮으면 붉은색입니다.</p>`;
   const verdictLine=rk=>{const order=["다음 단계 진행","맛 보강","관능 수정","맛·관능 보강","표본 부족"],c={};rk.forEach(x=>{const t=verdictOf(x.taste,x.sensory,x.n).text;c[t]=(c[t]||0)+1;});
     const parts=order.filter(t=>c[t]).map(t=>`${t} ${c[t]}종`);return parts.length?`<p class="vsum"><b>판정 요약</b> · ${parts.join(" · ")}</p>`:"";};
   const compoLine=gs=>grouped?`<p class="compo"><b>구성</b> · ${gs.filter(g=>g.names.length).map(g=>`${g.brands.length>1?"공통 메뉴":esc(g.brands[0])+" 전용"} ${g.names.length}종 (${g.names.map(esc).join(" · ")})`).join(" / ")}</p>`:"";
@@ -1005,7 +1003,7 @@ function _openReport(){
       tb+=`<table class="fx vt" style="width:${(oo.length/VC*100).toFixed(1)}%"><tr>${oo.map(o=>`<th>${esc(o)}</th>`).join("")}</tr><tr>${cc.map(c=>`<td${c===mx&&mx>0?' class="top"':""}><b>${c}표</b> <span class="pc">(${Math.round(c/tot*100)}%)</span></td>`).join("")}</tr></table>`;}
     h+=`<div class="vq" style="margin-bottom:10px"><b style="font-size:12.5px">${esc(b.label)}</b> <span style="color:#6f6b64;font-size:11px">· 응답 ${tot0}명 기준</span><div style="margin-top:3px">${tb}</div></div>`;});return h;};
   const pinsHtmlOf=list=>{const l=list.filter(x=>x.b.pin).map(x=>pinLine(x.b,ROWS)).filter(Boolean);return l.length?`<div class="pinbox">${l.join("<br>")}</div>`:"";};
-  const summaryHtml=(evx,n,pickList,gs)=>{const rk=rankOf(evx);return kpiHtml(rk,n)+compoLine(gs)+verdictLine(rk)+pinsHtmlOf(pickList)+`<h2>제품 랭킹 · 출시 판정</h2>`+rankTable(rk,true)+rule;};
+  const summaryHtml=(evx,n,pickList,gs)=>{const rk=rankOf(evx);return kpiHtml(rk,n)+compoLine(gs)+verdictLine(rk)+pinsHtmlOf(pickList)+`<h2>제품 랭킹 · 출시 판정</h2>`+rankTable(rk,true);};
   const title=CFG.meta.title||slug;
   let html=`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${esc(title)} 결과 보고서</title>
   <style>*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:'Malgun Gothic','맑은 고딕',system-ui,sans-serif;color:#1d1b18;margin:0;padding:30px 38px;font-size:13px;line-height:1.5}
