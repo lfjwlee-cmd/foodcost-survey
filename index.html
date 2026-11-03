@@ -144,7 +144,7 @@
   .lock .lerr{color:var(--bad);font-size:12.5px;margin-top:10px;min-height:16px}
   .banner{background:color-mix(in srgb,var(--warn) 14%,transparent);border:1px solid var(--warn);color:var(--warn);border-radius:10px;padding:11px 14px;font-size:12.5px;margin-bottom:16px;display:none}
   .dbtn{background:var(--surface);border:1px solid var(--line-strong);color:var(--muted);border-radius:9px;padding:7px 11px;font-size:12.5px;cursor:pointer;font-family:inherit}
-  .dbtn:hover{border-color:var(--accent);color:var(--ink)}select.dbtn{padding:6px 8px;max-width:150px}
+  .dbtn:hover{border-color:var(--accent);color:var(--ink)}select.dbtn{padding:6px 8px;max-width:min(330px,100%)}
   .admin{max-width:760px}
   .admin.wide{max-width:1200px}
   .ed-split{display:grid;grid-template-columns:minmax(0,1fr) 450px;gap:18px;align-items:start}
@@ -477,10 +477,10 @@ async function startDash(){
 }
 async function populateRounds(){
   const sel=$("roundSel"); if(!sel||!sb)return;
-  const counts={}; let respSlugs=[];
+  const counts={}, days={}, made={}; let respSlugs=[];
   try{ const {data}=await sb.from("svy_responses").select("survey_slug,created_at").order("created_at",{ascending:false});
-    (data||[]).forEach(r=>{counts[r.survey_slug]=(counts[r.survey_slug]||0)+1;}); respSlugs=[...new Set((data||[]).map(r=>r.survey_slug))]; }catch(e){}
-  let surveySlugs=[]; try{ const {data}=await sb.from("svy_surveys").select("slug,created_at").order("created_at",{ascending:false}); surveySlugs=(data||[]).map(r=>r.slug); }catch(e){}
+    (data||[]).forEach(r=>{counts[r.survey_slug]=(counts[r.survey_slug]||0)+1;(days[r.survey_slug]=days[r.survey_slug]||[]).push(r.created_at);}); respSlugs=[...new Set((data||[]).map(r=>r.survey_slug))]; }catch(e){}
+  let surveySlugs=[]; try{ const {data}=await sb.from("svy_surveys").select("slug,created_at").order("created_at",{ascending:false}); surveySlugs=(data||[]).map(r=>r.slug); (data||[]).forEach(r=>{made[r.slug]=r.created_at;}); }catch(e){}
   const cur=CFG.slug||"default";
   const valid=new Set([cur,...respSlugs,...surveySlugs]);
   if(viewSlug && !valid.has(viewSlug)) viewSlug=null; // 삭제된 회차 선택 방지
@@ -488,7 +488,7 @@ async function populateRounds(){
   if(!viewSlug && !(counts[cur]>0) && respSlugs.length){ viewSlug=respSlugs[0]; }
   const shown=viewSlug||cur;
   const all=[...valid];
-  sel.innerHTML=all.map(s=>`<option value="${esc(s)}" ${s===shown?'selected':''}>${esc(s)}${counts[s]?` · ${counts[s]}명`:' · 0명'}</option>`).join("");
+  sel.innerHTML=all.map(s=>`<option value="${esc(s)}" ${s===shown?'selected':''}>${esc(s)}${days[s]?` · ${dayRange(days[s])}`:(made[s]?` · ${dayRange([made[s]])} 생성`:"")}${counts[s]?` · ${counts[s]}명`:' · 0명'}</option>`).join("");
   sel.onchange=()=>{viewSlug=sel.value;loadDash();};
 }
 async function loadDash(){
@@ -796,6 +796,15 @@ function renderTally(resp){const el=$("tally");
   el.innerHTML=shown?h+`</div>`:`<div class="empty">이 브랜드에 해당하는 투표 문항이 없습니다</div>`;}
 /* 판정 텍스트(아이콘 없는 순수 문자열) — 화면·PDF·엑셀이 같은 기준을 쓴다 */
 function sigPlain(taste,sensory,n){return verdictOf(taste,sensory,n).text;}
+/* 응답 시각(ISO·UTC) 목록 → 시식한 날(현지 날짜): "10월 21일" · 며칠에 걸치면 "10월 21일~23일". 올해가 아니면 연도 포함 */
+function dayRange(list){
+  const ds=(list||[]).map(v=>new Date(v)).filter(d=>!isNaN(d.getTime())).sort((a,b)=>a-b); if(!ds.length) return "";
+  const yr=new Date().getFullYear(), A=ds[0], B=ds[ds.length-1];
+  const full=d=>(d.getFullYear()!==yr?d.getFullYear()+"년 ":"")+(d.getMonth()+1)+"월 "+d.getDate()+"일";
+  if(A.toDateString()===B.toDateString()) return full(A);
+  const sameMonth=A.getFullYear()===B.getFullYear()&&A.getMonth()===B.getMonth();
+  return full(A)+"~"+(sameMonth?B.getDate()+"일":full(B));
+}
 /* ISO(UTC) 문자열을 현지 시각 문자열로. 엑셀에서 그대로 읽힌다 */
 function fmtTime(v){
   if(!v) return "";
@@ -1020,7 +1029,7 @@ function _openReport(){
     h2,h3,.secbar,.gl{break-after:avoid;page-break-after:avoid}}</style></head><body>
   <div class="toolbar">${grouped?`<select id="vsel" aria-label="보고서 범위"><option value="__all">전체 (요약 + 메뉴 묶음별)</option>${brandViews.map((b,i)=>`<option value="b${i}">${esc(b)} 관련</option>`).join("")}${(tblocks.length||ops.length)?`<option value="__common">투표·의견만</option>`:""}</select>`:""}<button onclick="window.print()">🖨 인쇄 / PDF 저장</button></div>
   <h1>${esc(title)} — ${HASP?"시식 평가":"투표"} 결과 보고서<span id="bt"></span></h1>
-  <div class="sub">회차: ${esc(slug)} · 응답자 ${ROWS.length}명 · 생성 ${esc(new Date().toLocaleString('ko-KR'))}</div>
+  <div class="sub">회차: ${esc(slug)}${dayRange(ROWS.map(r=>r.created_at))?` · 시식일 ${esc(dayRange(ROWS.map(r=>r.created_at)))}`:""} · 응답자 ${ROWS.length}명 · 생성 ${esc(new Date().toLocaleString('ko-KR'))}</div>
   `;
   const bAttr=(fn)=>brandViews.map((b,i)=>fn(b)?" b"+i:"").join("");
   if(HASP){
