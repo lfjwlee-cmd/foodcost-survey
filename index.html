@@ -13,19 +13,19 @@
   :root{
     --bg:#ecebe7;--surface:#fff;--surface-2:#faf9f7;--field:#f4f2ee;
     --ink:#1d1b18;--muted:#6f6b64;--faint:#9a958d;--line:#e6e3dd;--line-strong:#d4d0c8;
-    --accent:#c1553a;--accent-ink:#fff;--accent-soft:#f3e2db;--good:#2f8f5b;--warn:#c9922b;--bad:#c0433a;--chart:#3d7f8f;--c-good:#5ea88a;--c-mid:#e3b55c;--c-low:#e08b7d;
+    --accent:#c1553a;--accent-ink:#fff;--accent-soft:#f3e2db;--good:#2f8f5b;--warn:#c9922b;--bad:#c0433a;
     --shadow:0 1px 2px rgba(30,25,20,.04),0 10px 30px -14px rgba(30,25,20,.18);--r:14px;
   }
   @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
     --bg:#100f0e;--surface:#1d1b19;--surface-2:#181615;--field:#26231f;
     --ink:#f0ede7;--muted:#a8a29a;--faint:#726d64;--line:#302d29;--line-strong:#413d37;
-    --accent:#e0755a;--accent-soft:#3a251e;--good:#4bb078;--warn:#e0ab48;--bad:#e0655b;--chart:#6db6c6;--c-good:#62bd95;--c-mid:#e5bb6a;--c-low:#e68c80;
+    --accent:#e0755a;--accent-soft:#3a251e;--good:#4bb078;--warn:#e0ab48;--bad:#e0655b;
     --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 32px -16px rgba(0,0,0,.7);
   }}
   :root[data-theme="dark"]{
     --bg:#100f0e;--surface:#1d1b19;--surface-2:#181615;--field:#26231f;
     --ink:#f0ede7;--muted:#a8a29a;--faint:#726d64;--line:#302d29;--line-strong:#413d37;
-    --accent:#e0755a;--accent-soft:#3a251e;--good:#4bb078;--warn:#e0ab48;--bad:#e0655b;--chart:#6db6c6;--c-good:#62bd95;--c-mid:#e5bb6a;--c-low:#e68c80;
+    --accent:#e0755a;--accent-soft:#3a251e;--good:#4bb078;--warn:#e0ab48;--bad:#e0655b;
     --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 32px -16px rgba(0,0,0,.7);
   }
   *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
@@ -128,15 +128,13 @@
   .heat-rl{font-size:12px;color:var(--muted);display:flex;align-items:center;font-weight:500}
   .cell{border-radius:7px;padding:10px 0;text-align:center;font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-weight:600;font-size:14px;color:var(--ink)}
   /* 기준 대비 3색 — PDF 보고서와 같은 구분(기준 이상 초록 · 0.5점 이내 미달 노랑 · 그 아래 붉은색). 테마 색을 섞어 다크 모드에서도 맞는다 */
-  .cell.hg{background:color-mix(in srgb,var(--c-good) 34%,var(--surface))}.cell.hy{background:color-mix(in srgb,var(--c-mid) 38%,var(--surface))}.cell.hr{background:color-mix(in srgb,var(--c-low) 34%,var(--surface))}
+  .cell.hg{background:color-mix(in srgb,var(--good) 26%,var(--surface))}.cell.hy{background:color-mix(in srgb,var(--warn) 30%,var(--surface))}.cell.hr{background:color-mix(in srgb,var(--bad) 26%,var(--surface))}
   .heat-rl small{font-weight:400;color:var(--faint);margin-left:4px;font-size:10.5px}.heat-h b{display:block;color:var(--ink);font-family:inherit;font-size:11px;font-weight:600}
-  .hk{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin:0 3px 0 8px}.hk.hg{background:var(--c-good)}.hk.hy{background:var(--c-mid)}.hk.hr{background:var(--c-low)}
+  .hk{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin:0 3px 0 8px}.hk.hg{background:color-mix(in srgb,var(--good) 40%,var(--surface))}.hk.hy{background:color-mix(in srgb,var(--warn) 45%,var(--surface))}.hk.hr{background:color-mix(in srgb,var(--bad) 40%,var(--surface))}
   .radar-wrap{display:flex;justify-content:center;padding:6px 0}.radar-legend{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:6px;font-size:12px;color:var(--muted)}.lg{display:inline-flex;align-items:center;gap:6px}.lg i{width:11px;height:3px;border-radius:2px}
   .bar-row{display:grid;grid-template-columns:120px 1fr 42px;align-items:center;gap:10px;margin-bottom:8px;font-size:12.5px}
-  .bar-track{background:var(--surface-2);border-radius:6px;height:21px;overflow:hidden;border:1px solid var(--line)}.bar-fill{height:100%;border-radius:6px 0 0 6px;background:var(--chart);transition:width .4s}.bar-fill.alt{background:color-mix(in srgb,var(--chart) 42%,var(--surface))}
-  /* 점수 막대 — 기준 대비 3색(히트맵·PDF 와 같은 구분), 부드러운 톤 */
-  .bar-fill.hg{background:var(--c-good)}.bar-fill.hy{background:var(--c-mid)}.bar-fill.hr{background:var(--c-low)}
-  .bar-val{text-align:right;font-family:"IBM Plex Mono",monospace;color:var(--muted);font-size:12px}.winner{color:var(--chart);font-weight:600}
+  .bar-track{background:var(--surface-2);border-radius:6px;height:21px;overflow:hidden;border:1px solid var(--line)}.bar-fill{height:100%;border-radius:6px 0 0 6px;background:var(--accent);transition:width .4s}.bar-fill.alt{background:color-mix(in srgb,var(--accent) 55%,var(--muted))}
+  .bar-val{text-align:right;font-family:"IBM Plex Mono",monospace;color:var(--muted);font-size:12px}.winner{color:var(--accent);font-weight:600}
   .op{border-left:2px solid var(--line-strong);padding:3px 0 3px 13px;margin-bottom:12px;font-size:12.5px}.op .op-meta{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--faint);margin-top:4px}.op q{color:var(--ink)}
   .prod-picker{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
   .pp{border:1px solid var(--line-strong);background:var(--surface-2);border-radius:8px;padding:6px 11px;font-size:12px;cursor:pointer;font-family:inherit;color:var(--muted);display:flex;align-items:center}.pp:hover{color:var(--ink);border-color:var(--accent)}.pp.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
@@ -185,7 +183,7 @@
   .sec-head h3{margin:0;font-size:16px;padding-left:10px;border-left:4px solid var(--accent);line-height:1.35}.sec-head p{margin:6px 0 0 14px;font-size:12.5px;color:var(--muted);line-height:1.5}
   .sec-head + section.q{border-top:none;padding-top:14px}
   .prev-body .sec-head + section.q{padding-top:12px}
-  .stag{font-style:normal;font-size:11px;color:var(--chart);border:1px solid color-mix(in srgb,var(--chart) 55%,transparent);border-radius:999px;padding:1px 8px;margin-left:8px}
+  .stag{font-style:normal;font-size:11px;color:var(--accent);border:1px solid var(--accent);border-radius:999px;padding:1px 8px;margin-left:8px}
   .tally-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px 22px}
   .tally-sec{grid-column:1/-1;margin-top:6px;padding:7px 12px;border-left:4px solid var(--accent);background:var(--surface-2);border-radius:8px;font-size:13px}.tally-sec span{color:var(--muted);font-size:12px;margin-left:8px}
   .tally-q{border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
@@ -771,10 +769,10 @@ function renderDetail(names){const nm=names[dstate.product];const pe=evAll().fil
   const spokes=AXB.map((a,i)=>{const ang=-Math.PI/2+i*2*Math.PI/AXB.length;return `<line x1="${cx}" y1="${cy}" x2="${(cx+R*Math.cos(ang)).toFixed(1)}" y2="${(cy+R*Math.sin(ang)).toFixed(1)}" stroke="var(--line)"/>`;}).join("");
   const labels=AXB.map((a,i)=>{const ang=-Math.PI/2+i*2*Math.PI/AXB.length;const lx=cx+(R+18)*Math.cos(ang),ly=cy+(R+18)*Math.sin(ang);return `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="10.5" fill="var(--muted)">${esc(a.label)}</text>`;}).join("");
   const allV=AXB.map(a=>avg(pe.map(e=>e.s[a.key]||0)));
-  svg.innerHTML=grid+spokes+`<polygon points="${polygon(cx,cy,R,allV)}" fill="color-mix(in srgb,var(--chart) 24%,transparent)" stroke="var(--chart)" stroke-width="2"/>`+labels;
-  $("radarLegend").innerHTML=`<span class="lg"><i style="background:var(--chart)"></i>${esc(nm)}</span><span class="lg" style="color:var(--faint)">n=${pe.length}</span>`;
+  svg.innerHTML=grid+spokes+`<polygon points="${polygon(cx,cy,R,allV)}" fill="color-mix(in srgb,var(--accent) 22%,transparent)" stroke="var(--accent)" stroke-width="2"/>`+labels;
+  $("radarLegend").innerHTML=`<span class="lg"><i style="background:var(--accent)"></i>${esc(nm)}</span><span class="lg" style="color:var(--faint)">n=${pe.length}</span>`;
   let vb=`<p class="cap" style="margin:0 0 10px">${esc(nm)} · 축별 평균</p>`;
-  const barOf=a=>{const v=avg(pe.map(e=>e.s[a.key]||0));return `<div class="bar-row"><div>${esc(a.label)}</div><div class="bar-track"><div class="bar-fill ${heatCls(v,axisGroup(a))}" style="width:${v/5*100}%"></div></div><div class="bar-val">${f1(v)}</div></div>`;};
+  const barOf=a=>{const v=avg(pe.map(e=>e.s[a.key]||0));return `<div class="bar-row"><div>${esc(a.label)}</div><div class="bar-track"><div class="bar-fill" style="width:${v/5*100}%"></div></div><div class="bar-val">${f1(v)}</div></div>`;};
   const gT=AXB.filter(a=>axisGroup(a)==="taste"), gS=AXB.filter(a=>axisGroup(a)!=="taste");
   if(gT.length>1&&gS.length){ // 맛 3·관능 5 구조: 그룹 평균(=랭킹의 맛·관능)을 머리글로, 그 아래에 항목별 점수
     const gh=(t,v)=>`<div style="display:flex;justify-content:space-between;align-items:baseline;margin:10px 0 6px;padding-bottom:3px;border-bottom:1px solid var(--line);font-size:12.5px"><b>${t}</b><b class="num">평균 ${f1(v)}</b></div>`;
