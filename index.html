@@ -488,7 +488,7 @@ async function populateRounds(){
   if(!viewSlug && !(counts[cur]>0) && respSlugs.length){ viewSlug=respSlugs[0]; }
   const shown=viewSlug||cur;
   const all=[...valid];
-  sel.innerHTML=all.map(s=>`<option value="${esc(s)}" ${s===shown?'selected':''}>${esc(s)}${days[s]?` · ${dayRange(days[s])}`:(made[s]?` · ${dayRange([made[s]])} 생성`:"")}${counts[s]?` · ${counts[s]}명`:' · 0명'}</option>`).join("");
+  sel.innerHTML=all.map(s=>`<option value="${esc(s)}" ${s===shown?'selected':''}>${esc(roundLabel(s,days[s],made[s],counts[s]||0))}</option>`).join("");
   sel.onchange=()=>{viewSlug=sel.value;loadDash();};
 }
 async function loadDash(){
@@ -804,6 +804,16 @@ function dayRange(list){
   if(A.toDateString()===B.toDateString()) return full(A);
   const sameMonth=A.getFullYear()===B.getFullYear()&&A.getMonth()===B.getMonth();
   return full(A)+"~"+(sameMonth?B.getDate()+"일":full(B));
+}
+/* 회차 선택창 이름 — "2026-10-28-시식3번-5명" (첫 응답 날짜-회차 이름·번호-응답 수).
+   회차 ID 앞의 날짜(2026-10-)는 떼고 뒤쪽 이름만 쓴다: "시식-3"→"시식3번", "홀시식"→"홀시식", 이름이 없으면 "시식". 응답이 없으면 회차 만든 날짜 */
+function roundLabel(slug,resp,made,n){
+  const d=new Date((resp&&resp.length?[...resp].sort()[0]:made)||NaN), z=x=>String(x).padStart(2,"0");
+  const ymd=isNaN(d.getTime())?"":d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate());
+  let nm=String(slug).replace(/^\d{4}-\d{2}(-\d{2})?-?/,"");
+  const m=nm.match(/^(.*?)-?(\d+)$/);
+  nm=m?(m[1]||"시식")+m[2]+"번":(nm||"시식");
+  return [ymd,nm,n+"명"].filter(Boolean).join("-");
 }
 /* ISO(UTC) 문자열을 현지 시각 문자열로. 엑셀에서 그대로 읽힌다 */
 function fmtTime(v){
