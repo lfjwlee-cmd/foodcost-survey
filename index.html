@@ -796,20 +796,16 @@ function renderTally(resp){const el=$("tally");
   el.innerHTML=shown?h+`</div>`:`<div class="empty">이 브랜드에 해당하는 투표 문항이 없습니다</div>`;}
 /* 판정 텍스트(아이콘 없는 순수 문자열) — 화면·PDF·엑셀이 같은 기준을 쓴다 */
 function sigPlain(taste,sensory,n){return verdictOf(taste,sensory,n).text;}
-/* 응답 시각(ISO·UTC) 목록 → 시식한 날(현지 날짜): "10월 21일" · 며칠에 걸치면 "10월 21일~23일". 올해가 아니면 연도 포함 */
-function dayRange(list){
-  const ds=(list||[]).map(v=>new Date(v)).filter(d=>!isNaN(d.getTime())).sort((a,b)=>a-b); if(!ds.length) return "";
-  const yr=new Date().getFullYear(), A=ds[0], B=ds[ds.length-1];
-  const full=d=>(d.getFullYear()!==yr?d.getFullYear()+"년 ":"")+(d.getMonth()+1)+"월 "+d.getDate()+"일";
-  if(A.toDateString()===B.toDateString()) return full(A);
-  const sameMonth=A.getFullYear()===B.getFullYear()&&A.getMonth()===B.getMonth();
-  return full(A)+"~"+(sameMonth?B.getDate()+"일":full(B));
+/* 시식일 = 그 회차의 첫 응답이 들어온 날(현지 날짜) "2026-10-28". 응답 시각(ISO·UTC) 목록에서 가장 이른 것 */
+function firstDay(list){
+  const t=(list||[]).map(v=>new Date(v).getTime()).filter(x=>!isNaN(x)); if(!t.length) return "";
+  const d=new Date(Math.min(...t)), z=x=>String(x).padStart(2,"0");
+  return d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate());
 }
 /* 회차 선택창 이름 — "2026-10-28-시식3번-5명" (첫 응답 날짜-회차 이름·번호-응답 수).
    회차 ID 앞의 날짜(2026-10-)는 떼고 뒤쪽 이름만 쓴다: "시식-3"→"시식3번", "홀시식"→"홀시식", 이름이 없으면 "시식". 응답이 없으면 회차 만든 날짜 */
 function roundLabel(slug,resp,made,n){
-  const d=new Date((resp&&resp.length?[...resp].sort()[0]:made)||NaN), z=x=>String(x).padStart(2,"0");
-  const ymd=isNaN(d.getTime())?"":d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate());
+  const ymd=firstDay(resp&&resp.length?resp:[made]);
   let nm=String(slug).replace(/^\d{4}-\d{2}(-\d{2})?-?/,"");
   const m=nm.match(/^(.*?)-?(\d+)$/);
   nm=m?(m[1]||"시식")+m[2]+"번":(nm||"시식");
@@ -1039,7 +1035,7 @@ function _openReport(){
     h2,h3,.secbar,.gl{break-after:avoid;page-break-after:avoid}}</style></head><body>
   <div class="toolbar">${grouped?`<select id="vsel" aria-label="보고서 범위"><option value="__all">전체 (요약 + 메뉴 묶음별)</option>${brandViews.map((b,i)=>`<option value="b${i}">${esc(b)} 관련</option>`).join("")}${(tblocks.length||ops.length)?`<option value="__common">투표·의견만</option>`:""}</select>`:""}<button onclick="window.print()">🖨 인쇄 / PDF 저장</button></div>
   <h1>${esc(title)} — ${HASP?"시식 평가":"투표"} 결과 보고서<span id="bt"></span></h1>
-  <div class="sub">회차: ${esc(slug)}${dayRange(ROWS.map(r=>r.created_at))?` · 시식일 ${esc(dayRange(ROWS.map(r=>r.created_at)))}`:""} · 응답자 ${ROWS.length}명 · 생성 ${esc(new Date().toLocaleString('ko-KR'))}</div>
+  <div class="sub">회차: ${esc(slug)}${firstDay(ROWS.map(r=>r.created_at))?` · 시식일 ${firstDay(ROWS.map(r=>r.created_at))}`:""} · 응답자 ${ROWS.length}명 · 생성 ${esc(new Date().toLocaleString('ko-KR'))}</div>
   `;
   const bAttr=(fn)=>brandViews.map((b,i)=>fn(b)?" b"+i:"").join("");
   if(HASP){
