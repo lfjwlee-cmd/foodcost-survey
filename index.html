@@ -986,14 +986,14 @@ function _openReport(){
   const compoLine=gs=>grouped?`<p class="compo"><b>구성</b> · ${gs.filter(g=>g.names.length).map(g=>`${g.brands.length>1?"공통 메뉴":esc(g.brands[0])+" 전용"} ${g.names.length}종 (${g.names.map(esc).join(" · ")})`).join(" / ")}</p>`:"";
   /* 제품별 항목 평균 — 항목 이름 구성이 같은 제품끼리 한 표로 묶고, 제품 이름 아래에 맛·관능·판정을 작게 붙여 이 표만 봐도 결론이 보이게 한다 */
   const AXN=evA.reduce((m,e)=>Math.max(m,axesForProd(CFG,e).length),1), axF=26, axU=Math.min(11,74/AXN);   // 제품 칸 26% + 항목 칸은 보고서 안에서 모두 같은 너비(항목 수가 달라도 칸 크기 동일)
-  /* 화면의 연령대×항목 히트맵을 보고서에도 — 제품마다 전체 + 응답이 있는 연령대 행(인원수 표기), 색은 대시보드 heatColor 와 같다 */
+  /* 화면의 연령대×항목 히트맵을 보고서에도 — 제품마다 전체 + 응답이 있는 연령대 행(인원수 표기), 색은 위 항목 평균 표와 같은 기준 3색(heat) */
   const ageList=(CFG.segments&&CFG.segments.age)||[];
   const heatTable=g=>{const tw=axF+axU*g.axes.length;
     return `<table class="fx hm" style="width:${tw.toFixed(1)}%"><colgroup><col style="width:${(axF/tw*100).toFixed(2)}%">${g.axes.map(()=>`<col style="width:${(axU/tw*100).toFixed(2)}%">`).join("")}</colgroup>${g.rows.map(({x,ax})=>{
-      const cells=sub=>ax.map(a=>{const vals=sub.map(e=>e.s[a.key]).filter(v=>typeof v==="number");if(!vals.length)return `<td class="e">–</td>`;const v=avg(vals);return `<td style="background:${heatColor(v)}">${f1(v)}</td>`;}).join("");
+      const cells=sub=>ax.map(a=>{const vals=sub.map(e=>e.s[a.key]).filter(v=>typeof v==="number");if(!vals.length)return `<td class="e">–</td>`;const v=avg(vals);return `<td class="${heat(v,axisGroup(a))}">${f1(v)}</td>`;}).join("");
       const rowsH=[["전체",x.pe],...ageList.map(a=>[a,x.pe.filter(e=>e.age===a)])].filter(([l,s],i)=>i===0||s.length);
       return `<tbody><tr class="hh"><th class="l">${esc(x.name)} <small>· 응답 ${x.n}명</small></th>${ax.map(a=>`<th>${esc(a.label)}</th>`).join("")}</tr>${rowsH.map(([l,s])=>`<tr><td class="l">${esc(l)} <small>(${s.length}명)</small></td>${cells(s)}</tr>`).join("")}</tbody>`;}).join("")}</table>`;};
-  const extrasOf=g=>(ASKP?`<h3>연령대 × 항목 히트맵 <small>· 칸 색이 진할수록 높은 점수 · 응답 없는 연령대는 생략</small></h3>${heatTable(g)}`:"");
+  const extrasOf=g=>(ASKP?`<h3>연령대 × 항목 히트맵 <small>· 위 표와 같은 색(기준 이상 초록 · 약간 미달 노랑 · 미달 붉은색) · 응답 없는 연령대는 생략</small></h3>${heatTable(g)}`:"");
   /* 같은 항목 구성(키·맛/관능 묶음이 같은 제품)은 항목 이름이 달라도 한 표로 합친다. 이름이 제품마다 다른 열은 머리글을 "제품별 항목"으로 두고 칸 아래에 그 제품의 항목 이름을 작게 붙인다.
      값 칸에는 판정 기준(맛·관능 최소 점수) 대비 옅은 색을 입힌다 — 기준 이상 초록 / 기준-0.5 이상 노랑 / 미만 붉은 기색 */
   const heat=(v,grp)=>{const m=grp==="taste"?TASTE_MIN:SENSORY_MIN;return v>=m?"hg":(v>=m-0.5?"hy":"hr");};
