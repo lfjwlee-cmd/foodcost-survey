@@ -211,7 +211,20 @@
   .hidden{display:none!important}
   @media(max-width:820px){.kpis{grid-template-columns:repeat(2,1fr)}.g2{grid-template-columns:1fr}.dash-head h1{font-size:19px}}
   @media(prefers-reduced-motion:reduce){*{transition:none!important}}
-</style>
+  /* 항목별 의견(시연 평가) — 점수 아래에 열리는 의견칸, 방향 칩, 결과의 항목별 의견 카드 */
+  [hidden]{display:none!important}
+  .cm-add{background:none;border:none;font-family:inherit;font-size:12.5px;color:var(--muted);padding:8px 0 0;cursor:pointer}.cm-add:hover{color:var(--ink)}
+  .cm-open{margin:12px 0 0;padding:11px 12px;border:1px solid var(--line);border-left:3px solid var(--accent);background:var(--surface-2);border-radius:10px}
+  .cm-q{font-size:12.5px;font-weight:600;margin-bottom:8px}.cm-q .optm{font-size:11px;color:var(--faint);font-weight:400;margin-left:4px}
+  .dir{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px}.dchip{border:1px solid var(--line-strong);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:12.5px;font-family:inherit;color:var(--muted);cursor:pointer}.dchip.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  textarea.cm-ta{min-height:54px;font-size:13px;padding:9px 11px}
+  .cm-prev{font-size:11.5px;color:var(--faint);margin:6px 0 0}
+  .iop-scroll{max-height:640px;overflow:auto;padding-right:4px}
+  .io-prod{display:flex;align-items:center;gap:6px;font-size:14px;margin:14px 0 4px}.io-prod:first-child{margin-top:4px}
+  .io-ax{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin:10px 0 4px;padding-top:6px;border-top:1px solid var(--line)}.io-axn{font-weight:700;font-size:13px}
+  .io-row{display:grid;grid-template-columns:34px 1fr;gap:10px;align-items:start;margin:6px 0;font-size:13px;line-height:1.5}.io-row .cell{padding:6px 0;font-size:13px}.io-row .io-m{color:var(--faint);font-size:11.5px}
+  .dtag{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:1px 8px;margin-right:4px;background:#fae4de;color:#a53f2d}.dtag.w{background:#f8f3d6;color:#8a6d12}.dtag.g{background:#e3f2e5;color:#2c6b3f}
+  </style>
 </head>
 <body>
 <div class="topbar">
@@ -350,7 +363,31 @@ $("alockInput").addEventListener("keydown",e=>{if(e.key==="Enter")tryUnlockAdmin
 $("themeBtn").onclick=()=>{const c=document.documentElement.getAttribute("data-theme");const n=c==="dark"?"light":(c==="light"?"dark":(matchMedia("(prefers-color-scheme: dark)").matches?"light":"dark"));document.documentElement.setAttribute("data-theme",n);};
 
 /* ===== FORM ===== */
-const answers={scores:{},extras:{},gender:null,age:null};
+const answers={scores:{},cm:{},extras:{},gender:null,age:null};
+/* ── 항목별 의견: 항목(축)마다 a.cm = "opt"(선택, 누르면 열림) | "low"(낮은 점수일 때 자동으로 열림), a.dir = 방향 칩 사용.
+      응답은 items[]._c = {축key:{d:"weak|ok|strong", t:"의견"}} 로 저장(점수와 같은 항목 안, DB 구조 변경 없음) ── */
+const CM_DIR=[["weak","너무 약함"],["ok","적당"],["strong","너무 강함"]];
+function cmLow(cfg){const n=+(((cfg||CFG||{}).meta||{}).cmLow);return n>=2&&n<=4?n:3;}
+function cmHtml(prod,a,cfg,opt){
+  if(a.cm!=="opt"&&a.cm!=="low") return "";
+  if(opt&&opt.preview) return a.cm==="low"?`<p class="cm-prev">※ ${cmLow(cfg)}점 이하를 고르면 의견칸이 열립니다</p>`:`<button type="button" class="cm-add" disabled>＋ 의견 남기기 (선택)</button>`;
+  const dir=a.dir?`<div class="dir">${CM_DIR.map(([k,l])=>`<button type="button" class="dchip" data-d="${k}">${l}</button>`).join("")}</div>`:"";
+  return `<div class="cm" data-prod="${esc(prod)}" data-axis="${a.key}" data-mode="${a.cm}">${a.cm==="opt"?`<button type="button" class="cm-add">＋ 의견 남기기 (선택)</button>`:""}<div class="cm-open" hidden><div class="cm-q">${a.cm==="low"?"어떤 점이 아쉬웠나요?":"의견"} <span class="optm">선택</span></div>${dir}<textarea class="cm-ta" maxlength="200" placeholder="${a.cm==="low"?"이유를 짧게 적어 주세요":"의견을 적어 주세요"}"></textarea></div></div>`;
+}
+function cmEl(prod,axis){return [...document.querySelectorAll(".cm")].find(x=>x.dataset.prod===prod&&x.dataset.axis===axis);}
+function cmSync(prod,axis){ // "낮은 점수일 때" 항목: 점수에 따라 의견칸을 열고 닫는다(닫히면 적어 둔 의견은 버린다)
+  const c=cmEl(prod,axis); if(!c||c.dataset.mode!=="low") return;
+  const sc=(answers.scores[prod]||{})[axis], on=!!(sc&&sc<=cmLow(CFG)), box=c.querySelector(".cm-open"); box.hidden=!on;
+  if(!on){ if(answers.cm[prod]) delete answers.cm[prod][axis]; c.querySelectorAll(".dchip.on").forEach(x=>x.classList.remove("on")); const ta=c.querySelector("textarea"); if(ta) ta.value=""; }
+}
+function cmCollect(b){ // 제출할 의견만 모은다 — 켜진 항목, 열려 있는 항목(낮은 점수 모드는 기준 이하일 때만), 내용이 있는 것
+  const out={}, m=answers.cm[b.name]||{}, sc=answers.scores[b.name]||{};
+  axesForProd(CFG,b).forEach(a=>{
+    if(a.cm!=="opt"&&a.cm!=="low") return; if(a.cm==="low"&&!(sc[a.key]&&sc[a.key]<=cmLow(CFG))) return;
+    const v=m[a.key]; if(!v) return; const t=(v.t||"").trim().slice(0,200), o={}; if(v.d&&a.dir) o.d=v.d; if(t) o.t=t;
+    if(o.d||o.t) out[a.key]=o; });
+  return Object.keys(out).length?out:null;
+}
 function buildFormHtml(cfg,opt){
   opt=opt||{};const m=cfg.meta||{};const ASK=askProfile(cfg);const HASP=hasProd(cfg);const SEG=cfg.segments||{gender:[],age:[]};
   const bcol=n=>{const b=(m.brands||[]).find(x=>x.name===n);return b?b.color:"var(--accent)";};
@@ -372,7 +409,7 @@ function buildFormHtml(cfg,opt){
         <div class="prod-head" style="margin:-2px 0 14px 18px"><span class="bname">${esc(brandLabel(b))}${b.tag?" · "+esc(b.tag):""}</span></div>`;
       axesForProd(cfg,b).forEach(a=>{h+=`<div class="axis"><div class="axis-name"><span>${esc(a.label)} <span class="req">*</span></span><span class="hint">${esc(a.hint||"")}</span></div>
         <div class="scale" data-prod="${esc(b.name)}" data-axis="${a.key}">${[5,4,3,2,1].map(x=>`<button type="button" class="sbtn" data-v="${x}">${x}</button>`).join("")}</div>
-        <div class="scale-ends"><span>매우 좋음</span><span>매우 아쉬움</span></div></div>`;});
+        <div class="scale-ends"><span>매우 좋음</span><span>매우 아쉬움</span></div>${cmHtml(b.name,a,cfg,opt)}</div>`;});
       h+=`</section>`;
     }else if(b.type==="price"||b.type==="choice"){
       h+=`<section class="q"><div class="q-num">Q${n}</div><div class="qlabel">${esc(b.label)} ${isReq(b)?`<span class="req">*</span>`:`<span class="optm">선택</span>`}</div>
@@ -397,7 +434,7 @@ function renderForm(){ $("app").innerHTML=buildFormHtml(CFG,{}); wireForm(); }
 function wireForm(){
   document.querySelectorAll(".scale").forEach(sc=>sc.querySelectorAll(".sbtn").forEach(btn=>btn.onclick=()=>{
     sc.querySelectorAll(".sbtn").forEach(x=>x.classList.remove("on"));btn.classList.add("on");
-    (answers.scores[sc.dataset.prod]=answers.scores[sc.dataset.prod]||{})[sc.dataset.axis]=+btn.dataset.v;prog();}));
+    (answers.scores[sc.dataset.prod]=answers.scores[sc.dataset.prod]||{})[sc.dataset.axis]=+btn.dataset.v;cmSync(sc.dataset.prod,sc.dataset.axis);prog();}));
   document.querySelectorAll("[data-seg]").forEach(ch=>ch.querySelectorAll(".cbtn").forEach(btn=>btn.onclick=()=>{
     ch.querySelectorAll(".cbtn").forEach(x=>x.classList.remove("on"));btn.classList.add("on");answers[ch.dataset.seg]=btn.dataset.v;prog();}));
   document.querySelectorAll(".choices[data-extra]").forEach(ch=>ch.querySelectorAll(".cbtn").forEach(btn=>btn.onclick=()=>{
@@ -405,6 +442,10 @@ function wireForm(){
   document.querySelectorAll(".imgchoices[data-extra]").forEach(ch=>ch.querySelectorAll(".imgc").forEach(btn=>btn.onclick=()=>{
     ch.querySelectorAll(".imgc").forEach(x=>x.classList.remove("on"));btn.classList.add("on");answers.extras[ch.dataset.extra]=btn.dataset.v;prog();}));
   document.querySelectorAll("textarea[data-extra]").forEach(t=>t.oninput=()=>{answers.extras[t.dataset.extra]=t.value;prog();});
+  document.querySelectorAll(".cm").forEach(c=>{const p=c.dataset.prod,k=c.dataset.axis,get=()=>{const m=(answers.cm[p]=answers.cm[p]||{});return m[k]=m[k]||{};};
+    const ad=c.querySelector(".cm-add"); if(ad) ad.onclick=()=>{c.querySelector(".cm-open").hidden=false;ad.hidden=true;};
+    c.querySelectorAll(".dchip").forEach(b=>b.onclick=()=>{const on=!b.classList.contains("on");c.querySelectorAll(".dchip").forEach(x=>x.classList.remove("on"));if(on)b.classList.add("on");const g=get();if(on)g.d=b.dataset.d;else delete g.d;});
+    const ta=c.querySelector("textarea"); if(ta) ta.oninput=()=>{get().t=ta.value;}; });
   $("form").addEventListener("click",ev=>{const s=ev.target.closest("section.q.missing");if(s)s.classList.remove("missing");});
   $("form").onsubmit=submit;
 }
@@ -443,7 +484,7 @@ async function submit(e){
     return;
   }
   err.style.display="none";
-  const items=CFG.blocks.filter(b=>b.type==="product").map(b=>({brand:b.brand,name:b.name,cat:b.cat||"",...answers.scores[b.name]}));
+  const items=CFG.blocks.filter(b=>b.type==="product").map(b=>{const it={brand:b.brand,name:b.name,cat:b.cat||"",...answers.scores[b.name]};const c=cmCollect(b);if(c)it._c=c;return it;});
   const ASKP=askProfile();
   const payload={survey_slug:CFG.slug||"default",gender:ASKP?answers.gender:null,age:ASKP?answers.age:null,items,extras:answers.extras};
   if(!sb){err.textContent="⚠ 서버 연결이 설정되지 않았습니다.";err.style.display="block";return;}
@@ -452,7 +493,7 @@ async function submit(e){
   if(error){err.textContent="⚠ 저장 실패: "+error.message;err.style.display="block";btn.disabled=false;btn.textContent=hasProd()?"평가 제출하기":"제출하기";return;}
   $("done").classList.add("show");window.scrollTo(0,0);
 }
-if($("again")) $("again").onclick=()=>{answers.scores={};answers.extras={};answers.gender=null;answers.age=null;$("done").classList.remove("show");renderForm();window.scrollTo(0,0);};
+if($("again")) $("again").onclick=()=>{answers.scores={};answers.cm={};answers.extras={};answers.gender=null;answers.age=null;$("done").classList.remove("show");renderForm();window.scrollTo(0,0);};
 
 /* ===== 결과 잠금 ===== */
 let unlocked=false;
@@ -472,7 +513,7 @@ try{ if(sessionStorage.getItem("svy_unlocked")==="1"){ unlocked=true; } }catch(e
 
 /* ===== DASHBOARD ===== */
 let ROWS=[],timer=null,dashStarted=false,viewSlug=null;
-const dstate={brand:"전체",age:"전체",gender:"전체",product:0,heat:"product"};
+const dstate={brand:"전체",age:"전체",gender:"전체",product:0,heat:"product",iopLow:false,iopAx:""};
 async function startDash(){
   $("lockPanel").classList.add("hidden");$("dash").classList.remove("hidden");
   if(!sb){$("cfgBanner").style.display="block";}
@@ -550,6 +591,7 @@ function _renderDash(){
       </div>
       <div class="dcol dcol-r">
         <div class="card c-heat"><h2>🔥 세그먼트 × 항목 히트맵</h2><p class="cap">연령대별 ${AXES.length}항목 평균 · "–"는 해당 응답 없음<br><span class="hk hg" style="margin-left:0"></span>판정 기준 이상<span class="hk hy"></span>기준에 0.5점 이내 미달<span class="hk hr"></span>그보다 낮음</p><div class="chips" id="heatMode" style="margin:0 0 10px"></div><div class="heat" id="heat"></div></div>
+        <div class="card c-iop" id="iopCard" style="display:none"><h2>🗨️ 항목별 의견</h2><p class="cap" id="iopCap"></p><div class="chips" id="iopChips" style="margin:0 0 10px"></div><div class="iop-scroll" id="iop"></div></div>
       </div>
     </div>`;
   }else{
@@ -562,7 +604,7 @@ function _renderDash(){
   renderKpis(ev,resp,names);renderInsight(ev,resp);
   if(HASP){
     renderPicker(names);renderDetail(names);
-    renderRank(ev);renderHeat(ev);buildHeatMode();
+    renderRank(ev);renderHeat(ev);buildHeatMode();renderItemOps(ev);
   }
   renderOpinions(resp);renderTally(resp);
 }
@@ -779,6 +821,40 @@ function renderDetail(names){const nm=names[dstate.product];const pe=evAll().fil
     vb+=gh("맛 "+gT.length+"항목",avg(pe.map(e=>tasteAvgOf(e.s))))+gT.map(barOf).join("")+gh("관능 "+gS.length+"항목",avg(pe.map(e=>otherAxisAvg(e.s))))+gS.map(barOf).join("");
   } else AXB.forEach(a=>{vb+=barOf(a);});
   $("votes").innerHTML=vb;}
+/* 항목별 의견 카드 — 제품 → 항목 순, 항목은 평균이 낮은 것부터, 의견은 낮은 점수부터. 필터(브랜드·연령·성별)는 위 칩을 따른다 */
+function renderItemOps(ev){
+  const card=$("iopCard"); if(!card) return;
+  const rows=[];
+  ev.forEach(e=>{const c=e.s&&e.s._c; if(!c) return;
+    axesForProd(CFG,e).forEach(a=>{const v=c[a.key]; if(!v) return; rows.push({name:e.name,key:a.key,label:a.label,grp:axisGroup(a),sc:e.s[a.key],d:v.d||"",t:v.t||"",age:e.age||"",gender:e.gender||""});});});
+  const enabled=AXES.some(a=>a.cm==="opt"||a.cm==="low");
+  if(!rows.length&&!enabled){card.style.display="none";return;}
+  card.style.display="";
+  const low=cmLow(CFG), axs=[...new Map(rows.map(r=>[r.key,r.label])).entries()];
+  if(dstate.iopAx&&!axs.some(([k])=>k===dstate.iopAx)) dstate.iopAx="";
+  const chips=$("iopChips"); chips.innerHTML="";
+  const mk=(txt,on,fn)=>{const b=document.createElement("button");b.className="chip"+(on?" on":"");b.textContent=txt;b.onclick=fn;chips.appendChild(b);};
+  mk("전체",!dstate.iopLow&&!dstate.iopAx,()=>{dstate.iopLow=false;dstate.iopAx="";renderItemOps(ev);});
+  mk(low+"점 이하만",dstate.iopLow,()=>{dstate.iopLow=!dstate.iopLow;renderItemOps(ev);});
+  axs.forEach(([k,l])=>mk(l,dstate.iopAx===k,()=>{dstate.iopAx=dstate.iopAx===k?"":k;renderItemOps(ev);}));
+  const list=rows.filter(r=>(!dstate.iopLow||(r.sc&&r.sc<=low))&&(!dstate.iopAx||r.key===dstate.iopAx));
+  $("iopCap").textContent=`제품 → 항목 순 · 낮은 점수가 위 · 의견 ${list.length}건${dstate.iopLow||dstate.iopAx?` (전체 ${rows.length}건 중)`:""}`;
+  if(!list.length){ $("iop").innerHTML=`<div class="empty">${rows.length?"조건에 맞는 의견이 없습니다":"아직 항목별 의견이 없습니다"}</div>`; return; }
+  const dl=Object.fromEntries(CM_DIR), dc={weak:"w",ok:"g",strong:""};
+  let h=""; const prods=[...new Set(ev.map(e=>e.name))].filter(n=>list.some(r=>r.name===n));
+  prods.forEach(nm=>{
+    const pr=list.filter(r=>r.name===nm), pe=ev.filter(e=>e.name===nm), ex=pe[0];
+    h+=`<div class="io-prod"><span class="brand-dot" style="background:${brandColor(prodBrands(ex)[0]||ex.brand)}"></span><b>${esc(nm)}</b><span class="cap">· 의견 ${pr.length}건 · 응답 ${pe.length}명</span></div>`;
+    const keys=[...new Set(pr.map(r=>r.key))].map(k=>({k,av:avg(pe.map(e=>e.s[k]).filter(v=>typeof v==="number"))})).sort((x,y)=>x.av-y.av);
+    keys.forEach(({k,av})=>{
+      const rs=pr.filter(r=>r.key===k).sort((x,y)=>(x.sc||9)-(y.sc||9));
+      const dirs=["weak","ok","strong"].map(d=>[d,rs.filter(r=>r.d===d).length]).filter(([,n])=>n);
+      h+=`<div class="io-ax"><span class="io-axn">${esc(rs[0].label)}</span><span class="cap">평균 ${f1(av)} · 의견 ${rs.length}건${dirs.length?" · 방향: "+dirs.map(([d,n])=>dl[d]+" "+n).join(" · "):""}</span></div>`;
+      rs.forEach(r=>{h+=`<div class="io-row"><span class="cell ${r.sc?heatCls(r.sc,r.grp):""}">${r.sc||"–"}</span><div>${r.d?`<span class="dtag ${dc[r.d]}">${esc(dl[r.d]||"")}</span>`:""}${esc(r.t)}<div class="io-m">${esc((r.age+" "+r.gender).trim())}</div></div></div>`;});
+    });
+  });
+  $("iop").innerHTML=h;
+}
 function renderOpinions(resp){const el=$("opinions");const texts=CFG.blocks.filter(b=>b.type==="text").map(b=>b.q);const list=[];
   resp.forEach(r=>{texts.forEach(q=>{const v=(r.extras||{})[q];if(v&&v.trim&&v.trim()&&v!=="."&&v!=="-")list.push({t:v,meta:`${r.age} ${r.gender}`});});});
   if(!list.length){el.innerHTML=`<div class="empty">의견 없음</div>`;return;}
@@ -934,6 +1010,18 @@ function _exportXlsx(){
     if(k) addSheet(wb,"자유 의견",ops,[6,17].concat(ASKP?[8,11]:[]).concat([26,70]));
   }
 
+  /* 시트 6. 항목별 의견 (제품 → 항목 → 낮은 점수 순) */
+  { const D=Object.fromEntries(CM_DIR), rowsC=[];
+    ROWS.forEach((r,ri)=>(r.items||[]).forEach(it=>{ const c=it._c; if(!c) return; const pb=prodBlocks.find(b=>b.name===it.name), ax=pb?axesForProd(CFG,pb):AXES;
+      ax.forEach((a,ai)=>{ const v=c[a.key]; if(!v) return;
+        rowsC.push({pi:Math.max(0,prodBlocks.findIndex(b=>b.name===it.name)),ai,ri,name:it.name,label:a.label,sc:typeof it[a.key]==="number"?it[a.key]:"",d:D[v.d]||"",t:v.t||"",r}); }); }));
+    if(rowsC.length){
+      rowsC.sort((x,y)=>x.pi-y.pi||x.ai-y.ai||((x.sc||9)-(y.sc||9))||x.ri-y.ri);
+      const oc=[["번호","응답 시각"].concat(ASKP?["성별","연령대"]:[]).concat(["제품","항목","점수","방향","의견"])];
+      rowsC.forEach((o,i)=>oc.push([i+1,fmtTime(o.r.created_at)].concat(ASKP?[o.r.gender||"",o.r.age||""]:[]).concat([o.name,o.label,o.sc,o.d,o.t])));
+      addSheet(wb,"항목별 의견",oc,[6,17].concat(ASKP?[8,11]:[]).concat([22,14,7,11,60]));
+    } }
+
   XLSX.writeFile(wb,slug+"_결과.xlsx");
 }
 function exportCsv(){ return withViewCfg(_exportCsv); }
@@ -1000,7 +1088,23 @@ function _openReport(){
       const rowsH=ageList.map(a=>[a,x.pe.filter(e=>e.age===a)]).filter(([l,s])=>s.length);   // 전체 행은 위 "제품별 항목 평균" 표와 같은 값이라 뺀다
       if(!rowsH.length) return "";
       return `<tbody><tr class="hh"><th class="l">${esc(x.name)} <small>· 응답 ${x.n}명</small></th>${ax.map(a=>`<th>${esc(a.label)}</th>`).join("")}</tr>${rowsH.map(([l,s])=>`<tr><td class="l">${esc(l)} <small>(${s.length}명)</small></td>${cells(s)}</tr>`).join("")}</tbody>`;}).join("")}</table>`;};
-  const extrasOf=g=>(ASKP&&g.rows.some(({x})=>ageList.some(a=>x.pe.some(e=>e.age===a)))?`<h3>연령대 × 항목 히트맵 <small>· 위 표와 같은 색(기준 이상 초록 · 약간 미달 노랑 · 미달 붉은색) · 전체 평균은 위 표 · 응답 없는 연령대는 생략</small></h3>${heatTable(g)}`:"");
+  /* 항목별 의견 — 제품마다 낮은 점수 항목부터, 항목당 낮은 점수 우선 5건까지(전체는 엑셀 「항목별 의견」 시트) */
+  const CM_PDF_MAX=5;
+  const commentsOf=g=>{
+    const dl=Object.fromEntries(CM_DIR); let any=false, cut=0;
+    const body=g.rows.map(({x,ax})=>{
+      const per=ax.map(a=>{const rs=[];x.pe.forEach(e=>{const v=e.s&&e.s._c&&e.s._c[a.key]; if(v) rs.push({sc:e.s[a.key],d:v.d||"",t:v.t||"",who:((e.age||"")+" "+(e.gender||"")).trim()});});
+        if(!rs.length) return null; rs.sort((p,q)=>(p.sc||9)-(q.sc||9)); const avgv=avg(x.pe.map(e=>e.s[a.key]).filter(v=>typeof v==="number"));
+        return {a,rs,avgv};}).filter(Boolean).sort((p,q)=>p.avgv-q.avgv);
+      if(!per.length) return ""; any=true;
+      return `<tbody><tr class="hh"><th class="l" colspan="5">${esc(x.name)} <small>· 응답 ${x.n}명</small></th></tr><tr class="ch"><th>항목</th><th>점수</th><th>방향</th><th>의견</th><th>응답자</th></tr>`
+        +per.map(({a,rs})=>{cut+=Math.max(0,rs.length-CM_PDF_MAX);
+          return rs.slice(0,CM_PDF_MAX).map((r,i)=>`<tr>${i===0?`<td class="l" rowspan="${Math.min(rs.length,CM_PDF_MAX)}"><b>${esc(a.label)}</b><br><small>평균 ${f1(avg(x.pe.map(e=>e.s[a.key]).filter(v=>typeof v==="number")))} · ${rs.length}건</small></td>`:""}<td class="${r.sc?heat(r.sc,axisGroup(a)):""}"><b>${r.sc||"–"}</b></td><td>${esc(dl[r.d]||"–")}</td><td class="l">${esc(r.t)}</td><td>${esc(r.who)}</td></tr>`).join("");}).join("")+`</tbody>`;
+    }).join("");
+    if(!any) return "";
+    return `<h3>항목별 의견 <small>· 낮은 점수 우선, 항목당 최대 ${CM_PDF_MAX}건${cut?` · 나머지 ${cut}건은 엑셀 「항목별 의견」 시트`:""}</small></h3><table class="fx cm"><colgroup><col style="width:15%"><col style="width:8%"><col style="width:13%"><col style="width:48%"><col style="width:16%"></colgroup>${body}</table>`;
+  };
+  const extrasOf=g=>(ASKP&&g.rows.some(({x})=>ageList.some(a=>x.pe.some(e=>e.age===a)))?`<h3>연령대 × 항목 히트맵 <small>· 위 표와 같은 색(기준 이상 초록 · 약간 미달 노랑 · 미달 붉은색) · 전체 평균은 위 표 · 응답 없는 연령대는 생략</small></h3>${heatTable(g)}`:"")+commentsOf(g);
   /* 같은 항목 구성(키·맛/관능 묶음이 같은 제품)은 항목 이름이 달라도 한 표로 합친다. 이름이 제품마다 다른 열은 머리글을 "제품별 항목"으로 두고 칸 아래에 그 제품의 항목 이름을 작게 붙인다.
      값 칸에는 판정 기준(맛·관능 최소 점수) 대비 옅은 색을 입힌다 — 기준 이상 초록 / 기준-0.5 이상 노랑 / 미만 붉은 기색 */
   const heat=(v,grp)=>{const m=grp==="taste"?TASTE_MIN:SENSORY_MIN;return v>=m?"hg":(v>=m-0.5?"hy":"hr");};
@@ -1032,6 +1136,7 @@ function _openReport(){
   table.vt th{padding:5px 4px}table.vt td{padding:6px 4px}td.top{background:#fbf3ef}td.top b{color:#c1553a}.pc{color:#6f6b64;font-size:.92em}
   table.ax th{padding:5px 2px;line-height:1.25}table.ax td{padding:6px 2px;font-size:13px}table.ax th.l,table.ax td.l{padding:5px 8px;font-size:12px}
   td.hg{background:#e3f2e5}
+  table.cm{margin-bottom:8px;break-inside:auto;page-break-inside:auto}table.cm td{padding:4px 5px;font-size:11.5px}table.cm td.l{text-align:left}table.cm td.l small{color:#8a857d;font-weight:400}table.cm tr.hh th.l{background:#f4f2ee;font-size:11.5px;padding:4px 8px}table.cm tr.ch th{background:#faf9f7;font-size:10.5px;font-weight:500;color:#6f6b64;padding:3px 4px}table.cm tbody{break-inside:avoid;page-break-inside:avoid}
   table.hm{margin-bottom:8px;break-inside:auto;page-break-inside:auto}table.hm th{font-size:10px;padding:4px 2px;line-height:1.2;font-weight:600}table.hm tr.hh th.l{font-size:11.5px;padding:4px 8px}table.hm td{padding:4px 2px;font-size:12px}table.hm td.l{padding:4px 8px;font-size:11px}table.hm td.l small{color:#8a857d}table.hm td.e{color:#b5b0a7;background:#faf9f7}table.hm tbody{break-inside:avoid;page-break-inside:avoid}td.hy{background:#f8f3d6}td.hr{background:#fae4de}td small.al{display:block;font-size:9.5px;font-weight:400;color:#6f6b64;line-height:1.2;margin-top:1px}
   td.l small.vd{font-weight:400;color:#6f6b64;font-size:10.5px}
   .op{border-left:3px solid #c1553a;padding:4px 10px;margin:6px 0;font-size:12px;background:#faf9f7}.op .m{color:#9a958d;font-size:10.5px}
@@ -1242,6 +1347,14 @@ function updateAxisNote(){ const el=$("axDiff"); if(!el||!ed)return;
   const c=axCtx();
   if(c){ const n=Object.keys(c.get()).length+((c.kind==="p"&&c.it&&typeof c.it.tasteN==="number")?1:0); el.textContent=n?`※ ${c.kind==="p"?"기본(공통·브랜드)":"공통"}과 다른 항목 ${n}개`:"바꾼 항목 없음 — 공통 이름을 따라가요"; return; }
   el.textContent=axesChanged()?"※ 기본 이름과 다른 항목이 있습니다":"기본 이름 그대로"; }
+/* 항목별 의견 설정(공통 선택 시에만) — 항목 이름과 달리 응답이 들어온 뒤에도 바꿀 수 있다(점수의 의미가 바뀌지 않으므로) */
+function cmRow(a,i,grp){
+  const dirBox=grp==="taste"?`<label style="font-size:12px"><input type="checkbox" data-axdir="${i}" ${a.dir?"checked":""} ${a.cm?"":"disabled"} style="width:auto;margin:0 4px 0 0;vertical-align:-2px"> 방향 칩 <span style="color:var(--faint)">(너무 약함·적당·너무 강함)</span></label>`:"";
+  return `<div style="margin:-2px 0 8px 52px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span style="font-size:11.5px;color:var(--muted)">의견 받기</span><select data-axcm="${i}" style="width:auto;border:1px solid var(--line-strong);background:var(--field);border-radius:8px;padding:5px 8px;font-family:inherit;font-size:12.5px;color:var(--ink)"><option value="" ${a.cm===""?"selected":""}>끔</option><option value="opt" ${a.cm==="opt"?"selected":""}>선택 (누르면 열림)</option><option value="low" ${a.cm==="low"?"selected":""}>낮은 점수일 때 (${ed.cmLow}점 이하)</option></select>${dirBox}</div>`;
+}
+function cmLowRow(){
+  return `<div style="margin:4px 0 8px 52px;display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted)">낮은 점수 기준 <select id="cmLowSel" style="width:auto;border:1px solid var(--line-strong);background:var(--field);border-radius:8px;padding:5px 8px;font-family:inherit;font-size:12.5px;color:var(--ink)">${[2,3,4].map(n=>`<option value="${n}" ${ed.cmLow===n?"selected":""}>${n}점 이하</option>`).join("")}</select><span style="color:var(--faint)">"낮은 점수일 때"로 정한 항목에만 적용됩니다</span></div>`;
+}
 function renderAxisRows(){
   const wrap=$("ed_axes_wrap"); if(!wrap||!ed) return;
   if(!edProds().length||!(ed.axes&&ed.axes.length)){ wrap.style.display="none"; wrap.innerHTML=""; return; }
@@ -1279,7 +1392,7 @@ function renderAxisRows(){
     const lv=C?((o&&o.label)?o.label:B.label):a.label, hv=C?((o&&o.hint!=null)?o.hint:B.hint):a.hint;
     const ph1=C?(B.label||a.defLabel):a.defLabel, ph2=C?B.hint:a.defHint;
     const ovL=!!(C&&o&&o.label), ovH=!!(C&&o&&o.hint!=null);
-    return `<div class="erow" style="grid-template-columns:46px 1fr 1.4fr${C?" 34px":""};margin-bottom:6px"><span class="type-badge" style="text-align:center;margin:0">${grpOf(i,a)==="taste"?"맛":"관능"}</span><input class="${ovL?"ov-on":""}" data-ax="${i}" data-k="label" maxlength="${AXIS_LABEL_MAX}" value="${esc(lv)}" placeholder="${esc(ph1)}" ${L.locked?"disabled":""}><input class="${ovH?"ov-on":""}" data-ax="${i}" data-k="hint" maxlength="${AXIS_HINT_MAX}" value="${esc(hv)}" placeholder="${esc(ph2)}" ${L.locked?"disabled":""}>${C?`<button type="button" class="abtn" data-axreset="${i}" title="이 줄만 ${C.kind==="p"?"브랜드·공통":"공통"} 이름으로 되돌리기" style="padding:6px 0" ${(ovL||ovH)&&!L.locked?"":"disabled"}>↺</button>`:""}</div>`;}).join("");
+    return `<div class="erow" style="grid-template-columns:46px 1fr 1.4fr${C?" 34px":""};margin-bottom:6px"><span class="type-badge" style="text-align:center;margin:0">${grpOf(i,a)==="taste"?"맛":"관능"}</span><input class="${ovL?"ov-on":""}" data-ax="${i}" data-k="label" maxlength="${AXIS_LABEL_MAX}" value="${esc(lv)}" placeholder="${esc(ph1)}" ${L.locked?"disabled":""}><input class="${ovH?"ov-on":""}" data-ax="${i}" data-k="hint" maxlength="${AXIS_HINT_MAX}" value="${esc(hv)}" placeholder="${esc(ph2)}" ${L.locked?"disabled":""}>${C?`<button type="button" class="abtn" data-axreset="${i}" title="이 줄만 ${C.kind==="p"?"브랜드·공통":"공통"} 이름으로 되돌리기" style="padding:6px 0" ${(ovL||ovH)&&!L.locked?"":"disabled"}>↺</button>`:""}</div>`+(C?"":cmRow(a,i,grpOf(i,a)));}).join("")+(C?"":cmLowRow());
   h+=`<div style="display:flex;gap:10px;align-items:center;margin-top:4px;flex-wrap:wrap"><button type="button" class="abtn" id="axReset" ${L.locked?"disabled":""}>${C?(C.kind==="p"?"브랜드·공통 이름과 같게":"공통 이름과 같게"):"기본값으로 되돌리기"}</button><span id="axDiff" style="font-size:11.5px;color:var(--faint)"></span></div>`;
   wrap.innerHTML=h; updateAxisNote();
   const sel=$("axBrandSel"); if(sel) sel.onchange=()=>{ ed.axT=sel.value; renderAxisRows(); renderItemRows(true); };
@@ -1300,6 +1413,9 @@ function renderAxisRows(){
       if(c.kind==="p"&&was!==(Object.keys(c.get()).length>0)) renderItemRows(true); // 제품 카드의 '↺ 공통으로' 버튼 표시 갱신
     } else a[k]=t.value;
     updateAxisNote(); };
+  wrap.querySelectorAll("[data-axcm]").forEach(sel=>sel.onchange=()=>{ const a=ed.axes[+sel.dataset.axcm]; a.cm=sel.value; if(!a.cm) a.dir=false; renderAxisRows(); schedulePreview(); });
+  wrap.querySelectorAll("[data-axdir]").forEach(ck=>ck.onchange=()=>{ ed.axes[+ck.dataset.axdir].dir=ck.checked; schedulePreview(); });
+  const cls=$("cmLowSel"); if(cls) cls.onchange=()=>{ ed.cmLow=+cls.value; renderAxisRows(); schedulePreview(); };
   wrap.querySelectorAll("[data-axreset]").forEach(b=>b.onclick=()=>{ if(axisLockInfo().locked) return; const c=axCtx(); if(!c) return; const a=ed.axes[+b.dataset.axreset];
     const m=c.get(); delete m[a.key]; if(c.prune) c.prune(m); renderAxisRows(); renderItemRows(true); schedulePreview(); });
   const clr=$("axClearAll"); if(clr) clr.onclick=()=>{ if(axisLockInfo().locked) return;
@@ -1321,8 +1437,8 @@ function buildEditModel(){
     return o;
   });
   const axes=(draft.axes||[]).map(a=>{const d=STD_AXIS_DEFAULTS[a.key]||{label:a.label||"",hint:a.hint||""};
-    return {key:a.key,group:axisGroup(a),label:a.label||"",hint:a.hint||"",defLabel:d.label,defHint:d.hint};});
-  ed={slug:draft.slug,axes,respN:0,title:(draft.meta&&draft.meta.title)||"",intro:(draft.meta&&draft.meta.intro)||"",showRubric:!(draft.meta&&draft.meta.showRubric===false),askProfile:!(draft.meta&&draft.meta.askProfile===false),brands:((draft.meta&&draft.meta.brands)||[]).map(b=>({name:b.name,color:b.color||"#c1553a"})),items,axT:"",brandAxes:JSON.parse(JSON.stringify((draft.meta&&draft.meta.brandAxes)||{}))};
+    return {key:a.key,group:axisGroup(a),label:a.label||"",hint:a.hint||"",defLabel:d.label,defHint:d.hint,cm:(a.cm==="opt"||a.cm==="low")?a.cm:"",dir:!!a.dir};});
+  ed={slug:draft.slug,axes,respN:0,title:(draft.meta&&draft.meta.title)||"",intro:(draft.meta&&draft.meta.intro)||"",showRubric:!(draft.meta&&draft.meta.showRubric===false),askProfile:!(draft.meta&&draft.meta.askProfile===false),brands:((draft.meta&&draft.meta.brands)||[]).map(b=>({name:b.name,color:b.color||"#c1553a"})),items,axT:"",brandAxes:JSON.parse(JSON.stringify((draft.meta&&draft.meta.brandAxes)||{})),cmLow:(+((draft.meta||{}).cmLow)>=2&&+((draft.meta||{}).cmLow)<=4)?+draft.meta.cmLow:3};
 }
 function renderEditor(){
   const el=$("editorArea");
@@ -1547,6 +1663,12 @@ function buildDraftCfg(){
     const baseNs=cfg.axes.filter(a=>axisGroup(a)==="taste").length, ptn={};
     ed.items.forEach(x=>{ if(x.kind==="product"&&x.name&&typeof x.tasteN==="number"&&x.tasteN!==baseNs&&x.tasteN>=1&&x.tasteN<cfg.axes.length) ptn[x.name]=x.tasteN; });
     if(Object.keys(ptn).length) cfg.meta.productTaste=ptn; else delete cfg.meta.productTaste;
+  }
+  if(ed.axes&&Array.isArray(cfg.axes)){ // 항목별 의견 설정 — 항목 이름과 달리 응답이 있는 회차에서도 반영한다
+    cfg.axes=cfg.axes.map((a,i)=>{const e=ed.axes[i]; if(!e||e.key!==a.key) return a; const o=Object.assign({},a);
+      if(e.cm==="opt"||e.cm==="low"){ o.cm=e.cm; if(e.dir) o.dir=true; else delete o.dir; } else { delete o.cm; delete o.dir; }
+      return o;});
+    if(cfg.axes.some(a=>a.cm==="low")&&ed.cmLow!==3) cfg.meta.cmLow=ed.cmLow; else delete cfg.meta.cmLow;
   }
   cfg.blocks=blocks; return cfg;
 }
